@@ -9,17 +9,19 @@ export function ColumnChart({ data, color = "var(--color-plum)", currency = "INR
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(...data.map((d) => d.value), 0);
   const nice = niceMax(max);
-  const ticks = [0, nice / 2, nice];
+  // with no data the max is 0, so only the baseline is drawn (avoids three identical gridlines / keys)
+  const ticks = nice > 0 ? [0, nice / 2, nice] : [0];
   return (
     <figure>
       <div className="relative" style={{ height }}>
-        {ticks.map((t) => (
-          <div key={t} className="absolute inset-x-0 flex items-center gap-2" style={{ bottom: `${(t / (nice || 1)) * 100}%` }}>
+        {nice === 0 && <div className="absolute inset-0 grid place-items-center pl-14 text-sm text-ink-soft">Nothing yet — this fills in as you plan and receive payments.</div>}
+        {ticks.map((t, i) => (
+          <div key={i} className="absolute inset-x-0 flex items-center gap-2" style={{ bottom: `${(t / (nice || 1)) * 100}%` }}>
             <span className="w-12 -translate-y-1/2 text-right text-[11px] tabular-nums text-ink-soft">{format(t)}</span>
             <span className="h-px flex-1 -translate-y-1/2 bg-line" />
           </div>
         ))}
-        <div className="absolute inset-y-0 left-14 right-0 flex items-end">
+        <div className={`absolute inset-y-0 left-14 right-0 flex items-end ${nice === 0 ? "pointer-events-none" : ""}`}>
           {data.map((d, i) => {
             const h = nice ? (d.value / nice) * 100 : 0;
             return (

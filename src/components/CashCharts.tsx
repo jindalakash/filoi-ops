@@ -25,8 +25,8 @@ export function InOutChart({ months, height = 200 }: { months: Month[]; height?:
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: OUT }} /> Money out</span>
       </div>
       <div className="relative" style={{ height }}>
-        {[0, 0.5, 1].map((t) => (
-          <div key={t} className="absolute inset-x-0 flex items-center gap-2" style={{ bottom: `${t * 100}%` }}>
+        {[0, 0.5, 1].map((t, i) => (
+          <div key={i} className="absolute inset-x-0 flex items-center gap-2" style={{ bottom: `${t * 100}%` }}>
             <span className="w-14 -translate-y-1/2 text-right text-[11px] tabular-nums text-ink-soft">{fmt(t * top)}</span>
             <span className="h-px flex-1 -translate-y-1/2 bg-line" />
           </div>

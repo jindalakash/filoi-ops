@@ -15,11 +15,12 @@ export async function login(_: ActionState, fd: FormData): Promise<ActionState> 
     return { error: "Incorrect email or password." };
   }
   const token = await signSession({ uid: user.id, role: user.role, name: user.name });
+  // "Keep me signed in" → 7-day cookie; otherwise it ends when the browser closes (the token itself still expires after 7 days)
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.COOKIE_SECURE === "1",
-    maxAge: SESSION_MAX_AGE,
+    ...(fd.get("remember") ? { maxAge: SESSION_MAX_AGE } : {}),
     path: "/",
   });
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });

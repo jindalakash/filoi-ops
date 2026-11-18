@@ -106,7 +106,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
                     <div className="min-w-0"><div className="truncate font-display font-semibold">{e.name}</div><div className="truncate text-sm text-ink-soft">{e.title ?? "—"}</div></div>
                     {e.isStaff ? <Badge tone="purple">Staff</Badge> : <Badge>Associate</Badge>}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1">{(e.expertise ?? "").split(",").map((t) => t.trim()).filter(Boolean).slice(0, 6).map((t) => <span key={t} className="rounded-full bg-mist px-2 py-0.5 text-xs">{t}</span>)}</div>
+                  <div className="mt-2 flex flex-wrap gap-1">{[...new Set((e.expertise ?? "").split(",").map((t) => t.trim()).filter(Boolean))].slice(0, 6).map((t) => <span key={t} className="rounded-full bg-mist px-2 py-0.5 text-xs">{t}</span>)}</div>
                   <div className="mt-3 flex justify-between text-xs text-ink-soft"><span>{e.yearsExperience != null ? `${e.yearsExperience} yrs` : ""}{e.nationality ? ` · ${e.nationality}` : ""}</span><span>{e.dailyRate ? <Amt v={e.dailyRate} c={e.rateCurrency} /> : ""}{e.dailyRate ? "/day" : ""}</span></div>
                   {!e.summary && e.cvFileName && <div className="mt-2 text-xs text-amber-700">CV uploaded — profile not filled yet</div>}
                 </Link>

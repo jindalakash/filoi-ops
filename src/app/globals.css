@@ -94,3 +94,20 @@ h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0
 
 /* smooth theme switch for surfaces */
 .card, .input, .btn-ghost { transition: background-color .25s ease, border-color .25s ease, color .25s ease; }
+
+/* ── Login screen motion ── */
+@keyframes aurora { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(6%, -4%) scale(1.08); } 66% { transform: translate(-5%, 5%) scale(0.95); } }
+@keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes shake { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(3px); } 30%, 50%, 70% { transform: translateX(-6px); } 40%, 60% { transform: translateX(6px); } }
+@keyframes fill-bar { from { width: 0; } }
+@keyframes caret { 50% { opacity: 0; } }
+.anim-aurora { animation: aurora 18s ease-in-out infinite; }
+.anim-floaty { animation: floaty 6s ease-in-out infinite; }
+.anim-fade-up { animation: fade-up .7s cubic-bezier(.2,.7,.2,1) both; }
+.anim-shake { animation: shake .45s cubic-bezier(.36,.07,.19,.97) both; }
+.anim-fill { animation: fill-bar 1.6s cubic-bezier(.2,.7,.2,1) both; }
+.dot-grid { background-image: radial-gradient(rgb(255 255 255 / .12) 1px, transparent 1px); background-size: 22px 22px; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-aurora, .anim-floaty, .anim-fade-up, .anim-shake, .anim-fill { animation: none !important; }
+}

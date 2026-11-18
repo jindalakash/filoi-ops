@@ -1,39 +1,39 @@
 import Image from "next/image";
-import { login } from "../actions/auth";
-import { ActionForm, SubmitButton } from "@/components/client";
+import { LoginForm } from "@/components/LoginForm";
+import { LoginShowcase } from "@/components/LoginShowcase";
 import { ThemeControls } from "@/components/ThemeControls";
 
 export const metadata = { title: "Sign in" };
 
+function greeting() {
+  const h = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" }).format(new Date()));
+  return h < 5 ? "Working late" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
   return (
-    <div className="grid min-h-dvh lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-navy lg:block">
-        <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-plum/40 blur-3xl" />
-        <div className="absolute -bottom-32 right-0 h-[28rem] w-[28rem] rounded-full bg-sky/30 blur-3xl" />
-        <div className="relative flex h-full flex-col justify-between p-12 text-white">
-          <div className="inline-flex w-fit rounded-xl bg-white px-3 py-2"><Image src="/filoi-logo.png" alt="Filoi" width={90} height={57} priority /></div>
-          <div>
-            <h1 className="max-w-md text-4xl font-semibold leading-tight">From tender to invoice, in one place.</h1>
-            <p className="mt-4 max-w-md text-white/70">Track proposals, deliverables, billing milestones and payments for every Filoi engagement — with reminders before anything slips.</p>
+    <div className="grid min-h-dvh lg:grid-cols-[1.15fr_1fr]">
+      <LoginShowcase />
+      <div className="relative flex flex-col bg-mist">
+        <div className="flex items-center justify-between p-5">
+          <div className="rounded-xl bg-white px-2.5 py-1.5 shadow-sm lg:invisible"><Image src="/filoi-logo.png" alt="Filoi" width={64} height={40} priority /></div>
+          <ThemeControls />
+        </div>
+        <div className="flex flex-1 items-center justify-center px-6 pb-16">
+          <div className="w-full max-w-[400px]">
+            <p className="anim-fade-up text-sm font-semibold text-plum" style={{ animationDelay: ".05s" }}>{greeting()} 👋</p>
+            <h2 className="anim-fade-up mt-1 font-display text-3xl font-semibold tracking-tight text-ink" style={{ animationDelay: ".1s" }}>Sign in to Filoi Ops</h2>
+            <p className="anim-fade-up mt-2 text-sm text-ink-soft" style={{ animationDelay: ".15s" }}>Proposals, projects and billing for the Filoi team.</p>
+            <div className="anim-fade-up mt-8" style={{ animationDelay: ".22s" }}>
+              <LoginForm next={next ?? "/"} />
+            </div>
+            <p className="anim-fade-up mt-8 text-center text-xs text-ink-soft" style={{ animationDelay: ".3s" }}>
+              New to the team? Your administrator creates your account.
+            </p>
           </div>
-          <div className="text-sm text-white/50">Filoi Private Limited · www.filoi.in</div>
         </div>
-      </div>
-      <div className="relative flex items-center justify-center p-6">
-        <ThemeControls className="absolute right-5 top-5" />
-        <div className="w-full max-w-sm">
-          <div className="mb-8 inline-flex rounded-xl bg-white px-3 py-2 lg:hidden"><Image src="/filoi-logo.png" alt="Filoi" width={80} height={50} priority /></div>
-          <h2 className="text-2xl font-semibold">Sign in</h2>
-          <p className="mt-1 text-sm text-ink-soft">Use the account your administrator created for you.</p>
-          <ActionForm action={login} className="mt-6 space-y-4">
-            <input type="hidden" name="next" value={next ?? "/"} />
-            <label className="block"><span className="label">Email</span><input name="email" type="email" required autoComplete="email" className="input" /></label>
-            <label className="block"><span className="label">Password</span><input name="password" type="password" required autoComplete="current-password" className="input" /></label>
-            <SubmitButton className="btn-primary w-full !py-2.5" pendingText="Signing in…">Sign in</SubmitButton>
-          </ActionForm>
-        </div>
+        <div className="pb-5 text-center text-[11px] text-ink-soft/70 lg:hidden">Filoi Private Limited · www.filoi.in</div>
       </div>
     </div>
   );
