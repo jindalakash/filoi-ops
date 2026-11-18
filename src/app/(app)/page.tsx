@@ -8,6 +8,7 @@ import { toINR } from "@/lib/fx";
 import { fyLabel } from "@/lib/codes";
 import { Card, Stat, Empty, Notice } from "@/components/ui";
 import { StatusBadge, DL_STATUS, OPP_STATUS, DueDate } from "@/components/badges";
+import { TaskRow } from "@/components/TaskParts";
 import { MultiMoney, Breakdown } from "@/components/Money";
 import { ColumnChart } from "@/components/ColumnChart";
 import { Amt } from "@/components/Money";
@@ -27,6 +28,15 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const in14 = new Date(today.getTime() + 14 * 86400000);
   const fyStart = new Date(today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1, 3, 1);
 
+  const myTasks = await db.proposalTask.findMany({
+    where: {
+      opportunity: { status: { in: ["DRAFT", "IN_REVIEW", "READY_TO_SUBMIT"] } },
+      OR: [{ assigneeId: user.id, status: { in: ["TODO", "IN_PROGRESS", "CHANGES_REQUESTED"] } }, { reviewerId: user.id, status: "IN_REVIEW" }],
+    },
+    include: { assignee: { select: { name: true } }, reviewer: { select: { name: true } }, opportunity: { select: { id: true, code: true, title: true } } },
+    orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
+    take: 6,
+  });
   const [oppCounts, wonFY, decidedFY, deliverables, deadlines, activeProjects] = await Promise.all([
     db.opportunity.groupBy({ by: ["status"], _count: true }),
     db.opportunity.count({ where: { status: "WON", decisionAt: { gte: fyStart } } }),
@@ -35,7 +45,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       where: { status: { not: "ACCEPTED" }, dueDate: { lte: in14 }, project: { status: "ACTIVE" }, ...(pm ? { OR: [{ ownerId: user.id }, { project: { managerId: user.id } }] } : {}) },
       include: { project: { include: { client: true } }, owner: true }, orderBy: { dueDate: "asc" }, take: 12,
     }),
-    db.opportunity.findMany({ where: { status: { in: ["DRAFT", "IN_REVIEW"] }, submissionDeadline: { gte: today } }, include: { client: true }, orderBy: { submissionDeadline: "asc" }, take: 6 }),
+    db.opportunity.findMany({ where: { status: { in: ["DRAFT", "IN_REVIEW", "READY_TO_SUBMIT"] }, submissionDeadline: { gte: today } }, include: { client: true }, orderBy: { submissionDeadline: "asc" }, take: 6 }),
     db.project.count({ where: { status: "ACTIVE" } }),
   ]);
   const cnt = (...s: string[]) => oppCounts.filter((c) => s.includes(c.status)).reduce((a, c) => a + c._count, 0);
@@ -104,9 +114,15 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         {can(user.role, "presales") && <Link href="/opportunities/new" className="btn-primary self-start">+ New proposal</Link>}
       </div>
 
+      {myTasks.length > 0 && (
+        <Card title="Waiting for you" className="mb-6" pad={false} actions={<Link href="/tasks" className="text-xs link">All my tasks</Link>}>
+          <ul className="divide-y divide-line">{myTasks.map((t) => <TaskRow key={t.id} t={t} showProposal />)}</ul>
+        </Card>
+      )}
+
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-soft">Proposals</h2>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Stat label="In draft / review" value={cnt("DRAFT", "IN_REVIEW")} hint={`${cnt("IN_REVIEW")} in internal review`} tone="sun" href="/opportunities?f=open" />
+        <Stat label="In preparation" value={cnt("DRAFT", "IN_REVIEW", "READY_TO_SUBMIT")} hint={`${cnt("IN_REVIEW")} in review · ${cnt("READY_TO_SUBMIT")} ready to submit`} tone="sun" href="/opportunities?f=open" />
         <Stat label="Submitted" value={cnt("SUBMITTED", "UNDER_EVALUATION")} hint="Awaiting client decision" tone="sky" href="/opportunities?f=pending" />
         <Stat label="Won" value={cnt("WON")} hint={`${wonFY} this financial year`} tone="green" href="/opportunities?f=won" />
         <Stat label="Lost / dropped" value={cnt("LOST", "CANCELLED", "NO_GO")} tone="red" href="/opportunities?f=closed" />

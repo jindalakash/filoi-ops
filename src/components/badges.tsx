@@ -19,6 +19,7 @@ export function Badge({ tone = "gray", children }: { tone?: Tone; children: Reac
 export const OPP_STATUS: Record<string, { label: string; tone: Tone }> = {
   DRAFT: { label: "Draft", tone: "gray" },
   IN_REVIEW: { label: "Internal review", tone: "amber" },
+  READY_TO_SUBMIT: { label: "Ready to submit", tone: "navy" },
   SUBMITTED: { label: "Submitted", tone: "blue" },
   UNDER_EVALUATION: { label: "Under evaluation", tone: "purple" },
   WON: { label: "Won", tone: "green" },
@@ -50,6 +51,14 @@ export const INV_STATUS: Record<string, { label: string; tone: Tone }> = {
   PARTIALLY_PAID: { label: "Part paid", tone: "amber" },
   PAID: { label: "Paid", tone: "green" },
   CANCELLED: { label: "Cancelled", tone: "gray" },
+};
+
+export const TASK_STATUS: Record<string, { label: string; tone: Tone }> = {
+  TODO: { label: "To do", tone: "gray" },
+  IN_PROGRESS: { label: "In progress", tone: "blue" },
+  IN_REVIEW: { label: "In review", tone: "purple" },
+  CHANGES_REQUESTED: { label: "Changes asked", tone: "amber" },
+  APPROVED: { label: "Approved", tone: "green" },
 };
 
 export function StatusBadge({ map, value }: { map: Record<string, { label: string; tone: Tone }>; value: string }) {

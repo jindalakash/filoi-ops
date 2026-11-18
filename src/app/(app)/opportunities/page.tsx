@@ -12,7 +12,7 @@ import type { OpportunityStatus, Prisma } from "@prisma/client";
 export const metadata = { title: "Proposals" };
 
 const FILTERS: { key: string; label: string; statuses?: OpportunityStatus[] }[] = [
-  { key: "open", label: "In progress", statuses: ["DRAFT", "IN_REVIEW"] },
+  { key: "open", label: "In progress", statuses: ["DRAFT", "IN_REVIEW", "READY_TO_SUBMIT"] },
   { key: "pending", label: "Awaiting result", statuses: ["SUBMITTED", "UNDER_EVALUATION"] },
   { key: "won", label: "Won", statuses: ["WON"] },
   { key: "closed", label: "Lost / dropped", statuses: ["LOST", "CANCELLED", "NO_GO"] },
@@ -56,7 +56,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
                     <td className="min-w-64"><div className="text-xs text-ink-soft">{o.code}</div><Link href={`/opportunities/${o.id}`} className="link">{o.title}</Link></td>
                     <td>{o.client.shortName || o.client.name}</td>
                     <td><StatusBadge map={OPP_STATUS} value={o.status} /></td>
-                    <td><DueDate value={o.submissionDeadline} done={!["DRAFT", "IN_REVIEW"].includes(o.status)} /></td>
+                    <td><DueDate value={o.submissionDeadline} done={!["DRAFT", "IN_REVIEW", "READY_TO_SUBMIT"].includes(o.status)} /></td>
                     <td className="text-ink-soft">{o.owner?.name ?? "—"}</td>
                     <td className="text-right tabular-nums">{o.estimatedValue ? <Amt v={o.estimatedValue} c={o.currency} /> : "—"}</td>
                   </tr>

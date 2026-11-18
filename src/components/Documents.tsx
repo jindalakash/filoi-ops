@@ -13,7 +13,7 @@ export const DOC_LABEL: Record<DocCategory, string> = {
 
 export function Documents({ docs, link, path, categories, defaultCategory, title = "Documents" }: {
   docs: (Document & { uploadedBy?: { name: string } | null })[];
-  link: { opportunityId?: string; projectId?: string; deliverableId?: string };
+  link: { opportunityId?: string; projectId?: string; deliverableId?: string; proposalTaskId?: string };
   path: string;
   categories: DocCategory[];
   defaultCategory: DocCategory;

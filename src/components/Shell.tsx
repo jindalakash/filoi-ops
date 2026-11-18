@@ -4,11 +4,12 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import clsx from "clsx";
-import { LayoutDashboard, FileText, FolderKanban, ListChecks, Receipt, Building2, Users, Settings, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, FileText, FolderKanban, ListChecks, Receipt, Building2, Users, Settings, LogOut, Menu, X } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ElementType; cap?: string };
 const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/tasks", label: "My tasks", icon: ClipboardCheck },
   { href: "/opportunities", label: "Proposals", icon: FileText, cap: "presalesView" },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/deliverables", label: "Deliverables", icon: ListChecks },
@@ -18,7 +19,7 @@ const NAV: NavItem[] = [
   { href: "/settings", label: "Settings", icon: Settings, cap: "admin" },
 ];
 
-export function Shell({ user, caps, logout, children }: { user: { name: string; role: string; roleLabel: string }; caps: string[]; logout: () => Promise<void>; children: React.ReactNode }) {
+export function Shell({ user, caps, logout, taskCount = 0, children }: { user: { name: string; role: string; roleLabel: string }; caps: string[]; logout: () => Promise<void>; taskCount?: number; children: React.ReactNode }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const items = NAV.filter((n) => !n.cap || caps.includes(n.cap));
@@ -40,6 +41,7 @@ export function Shell({ user, caps, logout, children }: { user: { name: string; 
               isActive(href) ? "bg-white/12 text-white shadow-[inset_3px_0_0_var(--color-sun)]" : "text-white/70 hover:bg-white/6 hover:text-white")}>
             <Icon size={18} strokeWidth={2} />
             {label}
+            {href === "/tasks" && taskCount > 0 && <span className="ml-auto rounded-full bg-sun px-2 py-0.5 text-[11px] font-bold text-night">{taskCount}</span>}
           </Link>
         ))}
       </div>

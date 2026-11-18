@@ -103,7 +103,7 @@ export async function runReminders() {
 
   // 4. Proposal submission deadlines
   const opps = await db.opportunity.findMany({
-    where: { status: { in: ["DRAFT", "IN_REVIEW"] }, submissionDeadline: { not: null } },
+    where: { status: { in: ["DRAFT", "IN_REVIEW", "READY_TO_SUBMIT"] }, submissionDeadline: { not: null } },
     include: { client: true, owner: true },
   });
   for (const o of opps) {
@@ -118,6 +118,27 @@ export async function runReminders() {
       { href: `${APP_URL()}/opportunities/${o.id}`, label: "Open proposal" },
     );
     tally(await sendOnce(`opp:${o.id}:${date(o.submissionDeadline)}:${t.tag}`, "proposal", to, subject, html));
+  }
+
+  // 5. Proposal tasks (assignee; reviewer while it waits for review)
+  const tasks = await db.proposalTask.findMany({
+    where: { status: { not: "APPROVED" }, dueDate: { not: null }, opportunity: { status: { in: ["DRAFT", "IN_REVIEW", "READY_TO_SUBMIT"] } } },
+    include: { assignee: true, reviewer: true, opportunity: true },
+  });
+  for (const t of tasks) {
+    summary.checked++;
+    const tr = trigger(t.dueDate, [2, 0], after);
+    if (!tr) continue;
+    const who = t.status === "IN_REVIEW" ? t.reviewer : t.assignee;
+    if (!who?.email) continue;
+    const verb = t.status === "IN_REVIEW" ? "review" : "complete";
+    const subject = `[${t.opportunity.code}] Task ${tr.d < 0 ? "overdue" : "due"}: ${t.title}`;
+    const html = emailShell(
+      tr.d < 0 ? "Task overdue" : "Task reminder",
+      `<p>Please ${verb} <b>${t.title}</b> for <b>${t.opportunity.title}</b> — it ${whenText(tr.d)} (due ${date(t.dueDate)}).</p>`,
+      { href: `${APP_URL()}/tasks/${t.id}`, label: "Open task" },
+    );
+    tally(await sendOnce(`task:${t.id}:${date(t.dueDate)}:${t.status}:${tr.tag}`, "task", [who.email], subject, html));
   }
 
   console.log("[reminders]", summary);

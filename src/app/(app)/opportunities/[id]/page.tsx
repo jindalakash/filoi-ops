@@ -15,6 +15,7 @@ import { aiReady } from "@/lib/ai/run";
 import { IntakeUploader } from "@/components/IntakeUploader";
 import { analyzeTender } from "@/app/actions/intake";
 import { Sparkles } from "lucide-react";
+import { ProposalTasks } from "@/components/ProposalTasks";
 
 export default async function OpportunityPage({ params }: PageProps<"/opportunities/[id]">) {
   const user = await requireUser();
@@ -56,7 +57,7 @@ export default async function OpportunityPage({ params }: PageProps<"/opportunit
         <div className="space-y-6 lg:col-span-2">
           <Card title="Key information">
             <KV items={[
-              ["Submission deadline", <DueDate key="d" value={o.submissionDeadline} done={!["DRAFT", "IN_REVIEW"].includes(o.status)} />],
+              ["Submission deadline", <DueDate key="d" value={o.submissionDeadline} done={!["DRAFT", "IN_REVIEW", "READY_TO_SUBMIT"].includes(o.status)} />],
               ["Deadline time", o.submissionDeadline ? o.submissionDeadline.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "—"],
               ["Query deadline", date(o.queryDeadline)],
               ["Pre-bid meeting", date(o.preBidDate)],
@@ -78,6 +79,7 @@ export default async function OpportunityPage({ params }: PageProps<"/opportunit
               </div>
             </Card>
           )}
+          <ProposalTasks opportunityId={id} manage={edit} ownerId={o.ownerId} deadline={o.submissionDeadline} hasChecklist={docsNeeded.length > 0} />
           <Documents docs={o.documents} link={{ opportunityId: id }} path={`/opportunities/${id}`} defaultCategory="TOR"
             categories={["TOR", "RFP", "TECHNICAL_PROPOSAL", "FINANCIAL_PROPOSAL", "CORRESPONDENCE", "CONTRACT", "OTHER"]}
             title="TOR, RFP & proposal files" />

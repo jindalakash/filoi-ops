@@ -26,6 +26,15 @@ payments (with TDS) and sends email reminders before anything is due.
 | **Providers** | Settings → AI: Anthropic Claude (default `claude-opus-5-5`, reads scanned PDFs, refusal fallback enabled), OpenAI, Google Gemini, or a free local model via Ollama (text PDFs only) |
 | **INR everywhere** | Every amount in USD/EUR is shown in ₹ (Settings → Currencies rates) with the original amount in brackets, e.g. ₹80.6L ($96K). Printed invoices stay in the invoice currency |
 
+## Proposal team workflow
+
+| Step | What happens |
+|---|---|
+| **Assign** | On a proposal, *Team & tasks → Assign a part*: title, assignee (any user, incl. Accounts for the financial part), reviewer, due date, instructions. Or *Create tasks from the submission checklist* (one per required document, due 2 days before submission). The assignee gets an email |
+| **Work** | The assignee sees it in **My tasks** (sidebar count + dashboard “Waiting for you”), uploads drafts on the task, and clicks **Mark done & send for review**, choosing the reviewer |
+| **Review** | The reviewer **approves** or **sends back** with a comment (emailed to the assignee). Discussion thread on every task |
+| **Ready** | When every part is approved the proposal turns **Ready to submit** and the owner is emailed. Tasks also get due-date reminders (2 days before, on the day, overdue) |
+
 ### Roles
 
 | | Admin | Project Manager | Accounts Manager |
@@ -46,6 +55,8 @@ npm run db:migrate            # create tables
 npm run db:seed               # first admin + Filoi company details
 npm run dev                   # http://localhost:3000
 ```
+
+After pulling changes that add a database migration, run `npm run db:migrate` and restart `npm run dev`.
 
 `npm run db:demo` adds sample WHO/UNICEF/Gavi data to explore.
 `npm run db:reset` wipes everything (demo included) and re-creates the admin — do this before going live.
