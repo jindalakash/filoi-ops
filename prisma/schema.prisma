@@ -123,6 +123,12 @@ model Opportunity {
   project   Project?
   documents Document[]
   tasks     ProposalTask[]
+  sections  ProposalSection[]
+  team      ProposalTeamMember[]
+  refs      ProposalReference[]
+  finLines  FinancialLine[]
+  finTaxRate Decimal? @db.Decimal(5, 2) // tax % on the financial proposal (0 for LUT exports)
+  finNotes   String?
 }
 
 // ───────────────────────── Delivery ─────────────────────────
@@ -436,4 +442,136 @@ model TaskComment {
   kind      String       @default("COMMENT") // COMMENT | ASSIGNED | STARTED | SUBMITTED | APPROVED | CHANGES | REOPENED
   body      String?
   createdAt DateTime     @default(now())
+}
+
+// ───────────────────────── Proposal engine (Phase 3) ─────────────────────────
+
+enum LibraryKind {
+  PAST_PROPOSAL // past technical proposals used as examples for drafting
+  FIN_TEMPLATE // past financial proposals / budget formats
+  COMPANY_PROFILE // company profile, capability statements
+  OTHER
+}
+
+/// Reusable documents: past proposals, company profile, templates. Text is extracted for AI drafting.
+model LibraryItem {
+  id           String      @id @default(cuid())
+  kind         LibraryKind @default(PAST_PROPOSAL)
+  title        String
+  description  String?
+  tags         String?
+  fileName     String
+  storedName   String
+  mimeType     String?
+  size         Int
+  textContent  String?
+  source       String? // "upload" | "templates-bank"
+  uploadedById String?
+  createdAt    DateTime    @default(now())
+}
+
+/// CV bank: staff and associate experts
+model Expert {
+  id              String   @id @default(cuid())
+  name            String
+  title           String?
+  email           String?
+  phone           String?
+  nationality     String?
+  yearsExperience Int?
+  expertise       String? // comma separated tags
+  languages       String?
+  education       String?
+  summary         String?
+  keyProjects     String?
+  dailyRate       Decimal? @db.Decimal(12, 2)
+  rateCurrency    String   @default("USD")
+  isStaff         Boolean  @default(false)
+  active          Boolean  @default(true)
+  cvFileName      String?
+  cvStoredName    String?
+  cvText          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  proposals ProposalTeamMember[]
+  finLines  FinancialLine[]
+}
+
+/// Experience bank: past assignments used as references in proposals
+model Reference {
+  id          String   @id @default(cuid())
+  title       String
+  client      String
+  country     String?
+  startDate   DateTime?
+  endDate     DateTime?
+  value       Decimal? @db.Decimal(16, 2)
+  currency    String   @default("USD")
+  description String?
+  services    String?
+  projectId   String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  proposals ProposalReference[]
+}
+
+model ProposalSection {
+  id            String      @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  seq           Int         @default(0)
+  title         String
+  guidance      String? // what this section must cover (from TOR / evaluation criteria)
+  content       String      @default("")
+  aiModel       String? // set when the last draft came from AI
+  updatedById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model ProposalTeamMember {
+  id            String      @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  expertId      String
+  expert        Expert      @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  position      String
+  isKey         Boolean     @default(true)
+  inputDays     Decimal?    @db.Decimal(8, 1)
+  seq           Int         @default(0)
+
+  @@unique([opportunityId, expertId, position])
+}
+
+model ProposalReference {
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  referenceId   String
+  reference     Reference   @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  seq           Int         @default(0)
+
+  @@id([opportunityId, referenceId])
+}
+
+enum CostCategory {
+  FEES
+  TRAVEL
+  PER_DIEM
+  OTHER
+}
+
+model FinancialLine {
+  id            String       @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  seq           Int          @default(0)
+  category      CostCategory @default(FEES)
+  description   String
+  expertId      String?
+  expert        Expert?      @relation(fields: [expertId], references: [id], onDelete: SetNull)
+  unit          String       @default("day")
+  quantity      Decimal      @db.Decimal(12, 2)
+  rate          Decimal      @db.Decimal(14, 2)
 }

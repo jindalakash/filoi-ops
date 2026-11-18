@@ -4,7 +4,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import clsx from "clsx";
-import { LayoutDashboard, ClipboardCheck, FileText, FolderKanban, ListChecks, Receipt, Building2, Users, Settings, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, BookOpen, FileText, FolderKanban, ListChecks, Receipt, Building2, Users, Settings, LogOut, Menu, X } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ElementType; cap?: string };
 const NAV: NavItem[] = [
@@ -14,6 +14,7 @@ const NAV: NavItem[] = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/deliverables", label: "Deliverables", icon: ListChecks },
   { href: "/finance", label: "Finance", icon: Receipt, cap: "financeView" },
+  { href: "/library", label: "Library", icon: BookOpen, cap: "library" },
   { href: "/clients", label: "Clients", icon: Building2 },
   { href: "/users", label: "Users", icon: Users, cap: "admin" },
   { href: "/settings", label: "Settings", icon: Settings, cap: "admin" },

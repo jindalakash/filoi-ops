@@ -11,6 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     can(user.role, "presales") && "presales",
     can(user.role, "financeView") && "financeView",
     can(user.role, "admin") && "admin",
+    (can(user.role, "presales") || can(user.role, "finance")) && "library",
   ].filter(Boolean) as string[];
   const live = { opportunity: { status: { in: ["DRAFT", "IN_REVIEW", "READY_TO_SUBMIT"] as ("DRAFT" | "IN_REVIEW" | "READY_TO_SUBMIT")[] } } };
   const taskCount = await db.proposalTask.count({

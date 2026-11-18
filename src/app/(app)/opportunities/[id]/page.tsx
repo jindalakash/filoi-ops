@@ -36,11 +36,14 @@ export default async function OpportunityPage({ params }: PageProps<"/opportunit
         back={{ href: "/opportunities", label: "Proposals" }}
         title={o.title}
         subtitle={<span className="flex flex-wrap items-center gap-2">{o.code} · <Link className="link" href={`/clients/${o.clientId}`}>{o.client.name}</Link> <StatusBadge map={OPP_STATUS} value={o.status} /></span>}
-        actions={edit && <>
+        actions={<>
+          <Link href={`/opportunities/${id}/workspace`} className="btn-primary">Open proposal workspace</Link>
+          {edit && <>
           <AutoSelect action={setOpportunityStatus} name="status" value={o.status} hidden={{ id }} className="!py-2 !text-sm"
             options={Object.entries(OPP_STATUS).map(([value, s]) => ({ value, label: `Status: ${s.label}` }))} />
           <Link href={`/opportunities/${id}/edit`} className="btn-ghost">Edit</Link>
           <ConfirmAction action={deleteOpportunity} fields={{ id }} label="Delete" confirm="Delete this proposal and its files?" className="btn-danger" />
+        </>}
         </>}
       />
 

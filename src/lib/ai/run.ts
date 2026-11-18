@@ -1,12 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSetting, type AiSettings } from "../settings";
 import { decrypt } from "../crypto";
+import { modelMatchesProvider } from "./models";
 import { documentText, isPdf, type SourceDoc } from "./text";
-import { TENDER_SCHEMA, CONTRACT_SCHEMA, type TenderExtraction, type ContractExtraction } from "./schemas";
+import { TENDER_SCHEMA, CONTRACT_SCHEMA, CV_SCHEMA, type TenderExtraction, type ContractExtraction, type CvExtraction } from "./schemas";
 
 export class AiError extends Error {}
 
-type Kind = "TENDER" | "CONTRACT";
+type Kind = "TENDER" | "CONTRACT" | "CV";
 export type RunResult<T> = { data: T; provider: string; model: string; inputTokens?: number; outputTokens?: number };
 
 const MAX_PDF_BYTES = 24 * 1024 * 1024; // Claude request limit is 32 MB (base64 adds ~33%)
@@ -26,6 +27,9 @@ Rules:
 - Evidence: give a short verbatim quote (under 30 words) for each key value you filled — title, client, deadline(s), budget/value, evaluation, and any payment terms — with the page number when you can tell it.
 - If several documents are given (e.g. TOR plus annexes), combine them.
 - File names are not data: never use a file name as a value (e.g. for source or reference).`;
+  if (kind === "CV")
+    return `${common}
+Task: read this CV / résumé and capture the expert's profile for a consulting firm's CV bank. Summarise in the third person, factual, no embellishment.`;
   if (kind === "TENDER")
     return `${common}
 Task: read this tender (TOR / RFP / EOI) and capture what the bid team needs to decide and to prepare the proposal. Write scope_summary and eligibility in clear, concise English. List every document the bidder must submit in required_documents. Flag anything risky or unusual in risks.`;
@@ -39,6 +43,7 @@ async function config(): Promise<AiSettings & { apiKey: string }> {
   const apiKey = decrypt(ai.apiKeyEnc);
   if (ai.provider !== "ollama" && !apiKey) throw new AiError("No API key saved. An admin can add one in Settings → AI.");
   if (!ai.model) throw new AiError("No model selected in Settings → AI.");
+  if (!modelMatchesProvider(ai.provider, ai.model)) throw new AiError(`The model “${ai.model}” doesn't match the ${ai.provider} provider. Pick a model in Settings → AI.`);
   return { ...ai, apiKey };
 }
 
@@ -79,7 +84,7 @@ async function runClaude<T>(cfg: Awaited<ReturnType<typeof config>>, kind: Kind,
       content.push({ type: "document", title: d.fileName, source: { type: "text", media_type: "text/plain", data: t } });
     }
   }
-  content.push({ type: "text", text: kind === "TENDER" ? "Extract the tender details." : "Extract the contract details." });
+  content.push({ type: "text", text: kind === "TENDER" ? "Extract the tender details." : kind === "CV" ? "Extract the CV details." : "Extract the contract details." });
 
   const modern = MODERN_CLAUDE.includes(cfg.model);
   const stream = client.beta.messages.stream({
@@ -170,6 +175,67 @@ async function run<T>(kind: Kind, docs: SourceDoc[], schema: object): Promise<Ru
 
 export const extractTender = (docs: SourceDoc[]) => run<TenderExtraction>("TENDER", docs, TENDER_SCHEMA);
 export const extractContract = (docs: SourceDoc[]) => run<ContractExtraction>("CONTRACT", docs, CONTRACT_SCHEMA);
+export const extractCv = (docs: SourceDoc[]) => run<CvExtraction>("CV", docs, CV_SCHEMA);
+
+// ── Free-text drafting (proposal sections) ──
+export type DraftResult = { text: string; provider: string; model: string };
+
+/** Generate prose from a system prompt and a context bundle. Text only, so it works with every provider. */
+export async function draftText(system: string, context: string, request: string): Promise<DraftResult> {
+  const cfg = await config();
+  const user = `${context}\n\n=== YOUR TASK ===\n${request}`;
+  if (user.length > MAX_TEXT_CHARS) throw new AiError("Too much context for one request. Remove some library documents or shorten the TOR.");
+  if (cfg.provider === "anthropic") {
+    const client = new Anthropic({ apiKey: cfg.apiKey, ...(cfg.baseUrl ? { baseURL: cfg.baseUrl } : {}) });
+    const modern = MODERN_CLAUDE.includes(cfg.model);
+    try {
+      const msg = await client.beta.messages
+        .stream({
+          model: cfg.model,
+          max_tokens: 16000,
+          system,
+          messages: [{ role: "user", content: user }],
+          ...(modern ? { output_config: { effort: "medium" as const }, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+        })
+        .finalMessage();
+      if (msg.stop_reason === "refusal") throw new AiError("The model declined to write this section.");
+      const text = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("").trim();
+      if (msg.stop_reason === "max_tokens") throw new AiError("The draft was too long and got cut off. Ask for a shorter section.");
+      return { text, provider: "anthropic", model: msg.model };
+    } catch (e) {
+      if (e instanceof AiError) throw e;
+      if (e instanceof Anthropic.AuthenticationError) throw new AiError("Claude rejected the API key. Check it in Settings → AI.");
+      if (e instanceof Anthropic.RateLimitError) throw new AiError("Claude rate limit reached. Wait a minute and try again.");
+      if (e instanceof Anthropic.APIError) throw new AiError(`Claude API error ${e.status ?? ""}: ${e.message}`);
+      throw e;
+    }
+  }
+  if (cfg.provider === "openai") {
+    const res = await fetch(`${cfg.baseUrl || "https://api.openai.com/v1"}/chat/completions`, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify({ model: cfg.model, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+    });
+    if (!res.ok) throw new AiError(`OpenAI error ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const j = await res.json();
+    return { text: (j.choices?.[0]?.message?.content ?? "").trim(), provider: "openai", model: cfg.model };
+  }
+  if (cfg.provider === "gemini") {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:generateContent`, {
+      method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": cfg.apiKey },
+      body: JSON.stringify({ system_instruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }] }),
+    });
+    if (!res.ok) throw new AiError(`Gemini error ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const j = await res.json();
+    return { text: (j.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("").trim(), provider: "gemini", model: cfg.model };
+  }
+  const res = await fetch(`${cfg.baseUrl || "http://localhost:11434"}/api/chat`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: cfg.model, stream: false, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+  }).catch(() => { throw new AiError("Could not reach Ollama. Is it running?"); });
+  if (!res.ok) throw new AiError(`Ollama error ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const j = await res.json();
+  return { text: (j.message?.content ?? "").replace(/<think>[\s\S]*?<\/think>/g, "").trim(), provider: "ollama", model: cfg.model };
+}
 
 export async function aiReady() {
   const ai = await getSetting("ai");

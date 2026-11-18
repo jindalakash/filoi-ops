@@ -128,3 +128,27 @@ export type ContractExtraction = {
   payment_schedule: { title: string; percent: number | null; amount: number | null; deliverable_title: string | null; due_date: string | null }[];
   penalties: string | null; notes: string[]; evidence: { field: string; quote: string; page: number | null }[];
 };
+
+export const CV_SCHEMA = {
+  type: "object",
+  properties: {
+    name: { type: "string" },
+    title: { ...str, description: "Current position / professional title" },
+    email: str,
+    phone: str,
+    nationality: str,
+    years_experience: { ...int, description: "Total years of professional experience" },
+    expertise: { type: "array", items: { type: "string" }, description: "5–10 short expertise tags, e.g. DHIS2, immunization, M&E" },
+    languages: { type: "array", items: { type: "string" } },
+    education: { ...str, description: "Degrees with institution and year, one per line" },
+    summary: { type: "string", description: "4–6 sentence professional summary" },
+    key_projects: { type: "array", items: { type: "string" }, description: "Most relevant assignments: role, client, country, years" },
+  },
+  required: ["name", "title", "email", "phone", "nationality", "years_experience", "expertise", "languages", "education", "summary", "key_projects"],
+  additionalProperties: false,
+} as const;
+
+export type CvExtraction = {
+  name: string; title: string | null; email: string | null; phone: string | null; nationality: string | null; years_experience: number | null;
+  expertise: string[]; languages: string[]; education: string | null; summary: string; key_projects: string[];
+};

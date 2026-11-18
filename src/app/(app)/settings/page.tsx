@@ -5,16 +5,10 @@ import { decrypt, mask } from "@/lib/crypto";
 import { PageHeader, Card, Field, Tabs, Notice } from "@/components/ui";
 import { Badge } from "@/components/badges";
 import { ActionForm, SubmitButton } from "@/components/client";
-import { saveCompany, saveFx, saveSmtp, sendTestEmail, saveReminders, runRemindersNow, saveAi, testAi } from "@/app/actions/settings";
+import { saveCompany, saveFx, saveSmtp, sendTestEmail, saveReminders, runRemindersNow, testAi } from "@/app/actions/settings";
+import { AiSettingsForm } from "@/components/AiSettingsForm";
 
 export const metadata = { title: "Settings" };
-
-const MODELS: Record<string, string[]> = {
-  anthropic: ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5"],
-  openai: ["gpt-5", "gpt-5-mini"],
-  gemini: ["gemini-2.5-pro", "gemini-2.5-flash"],
-  ollama: ["llama3.1", "qwen2.5"],
-};
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const user = await requireUser("admin");
@@ -135,22 +129,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <div className="grid max-w-5xl gap-6 lg:grid-cols-3">
           <Card title="AI provider" className="lg:col-span-2">
             <div className="mb-4"><Notice>AI is optional. When enabled, it reads uploaded TORs / RFPs and contracts and pre-fills proposals, deliverables and payment schedules for you to review. Documents are sent only to the provider you choose; keys are stored encrypted in your own database. Claude and Gemini also read scanned PDFs; OpenAI and Ollama need PDFs with a text layer.</Notice></div>
-            <ActionForm action={saveAi}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="flex items-center gap-2 text-sm font-semibold sm:col-span-2"><input type="checkbox" name="enabled" defaultChecked={ai.enabled} className="h-4 w-4 accent-plum" /> Enable AI features</label>
-                <Field label="Provider">
-                  <select name="provider" defaultValue={ai.provider} className="input">
-                    <option value="anthropic">Anthropic Claude (recommended — reads scanned PDFs)</option><option value="openai">OpenAI</option><option value="gemini">Google Gemini</option><option value="ollama">Ollama (local, free)</option>
-                  </select>
-                </Field>
-                <Field label="Model" hint="Claude: claude-opus-5-5 (best), claude-sonnet-5-5 or claude-haiku-5-5 (cheaper)"><input name="model" defaultValue={ai.model} className="input" list="models" />
-                  <datalist id="models">{Object.values(MODELS).flat().map((m) => <option key={m} value={m} />)}</datalist>
-                </Field>
-                <Field label="API key" hint={ai.apiKeyEnc ? `Saved: ${mask(decrypt(ai.apiKeyEnc))} — leave blank to keep` : "Not needed for Ollama"}><input name="apiKey" type="password" className="input" autoComplete="off" /></Field>
-                <Field label="Custom base URL" hint="Only for Ollama / Azure / proxies"><input name="baseUrl" defaultValue={ai.baseUrl} className="input" placeholder="http://localhost:11434" /></Field>
-              </div>
-              <div className="mt-6 flex justify-end border-t border-line pt-5"><SubmitButton>Save</SubmitButton></div>
-            </ActionForm>
+            <AiSettingsForm enabled={ai.enabled} provider={ai.provider} model={ai.model} baseUrl={ai.baseUrl} keyHint={ai.apiKeyEnc ? mask(decrypt(ai.apiKeyEnc)) : ""} />
           </Card>
           <Card title="Connection test">
             <p className="mb-3 text-sm text-ink-soft">Checks the saved key against the provider (no document is sent).</p>

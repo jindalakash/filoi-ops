@@ -8,6 +8,7 @@ import { sendMail, emailShell } from "@/lib/email";
 import { runReminders } from "@/lib/reminders";
 import { splitEmails } from "@/lib/format";
 import type { ActionState } from "@/components/client";
+import { listModels, modelMatchesProvider, type ModelOption } from "@/lib/ai/models";
 
 const s = (fd: FormData, k: string) => str(fd, k) ?? "";
 
@@ -80,11 +81,15 @@ export async function saveAi(_: ActionState, fd: FormData): Promise<ActionState>
   await requireUser("admin");
   return guard(async () => {
     const key = s(fd, "apiKey");
+    const provider = s(fd, "provider") || "anthropic";
+    const model = s(fd, "model");
+    if (!model) return { error: "Choose a model." };
+    if (!modelMatchesProvider(provider, model)) return { error: `“${model}” is not a ${provider} model. Pick one from the list.` };
     await saveSetting("ai", {
-      enabled: fd.get("enabled") === "on", provider: (s(fd, "provider") || "anthropic") as AiSettings["provider"], model: s(fd, "model"),
+      enabled: fd.get("enabled") === "on", provider: (s(fd, "provider") || "anthropic") as AiSettings["provider"], model: s(fd, "model") || s(fd, "customModel"),
       baseUrl: s(fd, "baseUrl"), ...(key ? { apiKeyEnc: encrypt(key) } : {}),
     });
-    return { ok: "AI settings saved." };
+    return { ok: `AI settings saved — ${provider} · ${model}.` };
   });
 }
 
@@ -106,4 +111,19 @@ export async function testAi(): Promise<ActionState> {
     }
     return res.ok ? { ok: `Connected to ${ai.provider}.` } : { error: `${ai.provider} answered ${res.status}: ${(await res.text()).slice(0, 160)}` };
   });
+}
+
+/** Called directly from the AI settings form: models available for a provider + key (typed or saved). */
+export async function loadAiModels(provider: string, typedKey: string, baseUrl: string): Promise<{ models?: ModelOption[]; error?: string }> {
+  await requireUser("admin");
+  try {
+    const saved = await getSetting("ai");
+    const key = typedKey.trim() || (saved.provider === provider ? decrypt(saved.apiKeyEnc) : "") || decrypt(saved.apiKeyEnc);
+    if (provider !== "ollama" && !key) return { error: "Paste the API key first." };
+    const models = await listModels(provider, key, baseUrl.trim());
+    return models.length ? { models } : { error: "No models found for this key." };
+  } catch (e) {
+    const m = e instanceof Error ? e.message : String(e);
+    return { error: /401|authentication|invalid x-api-key/i.test(m) ? "The provider rejected this API key." : m.slice(0, 200) };
+  }
 }

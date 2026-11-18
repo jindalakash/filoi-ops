@@ -26,6 +26,18 @@ payments (with TDS) and sends email reminders before anything is due.
 | **Providers** | Settings → AI: Anthropic Claude (default `claude-opus-5-5`, reads scanned PDFs, refusal fallback enabled), OpenAI, Google Gemini, or a free local model via Ollama (text PDFs only) |
 | **INR everywhere** | Every amount in USD/EUR is shown in ₹ (Settings → Currencies rates) with the original amount in brackets, e.g. ₹80.6L ($96K). Printed invoices stay in the invoice currency |
 
+## Phase 3 — Proposal engine
+
+| Area | Features |
+|---|---|
+| **Library** (sidebar) | Past proposals, financial formats and company profile (text extracted for AI); **CV bank** of staff & associate experts with daily rates and CV files (“Read CV with AI” fills the profile); **experience bank** of past assignments (“Add from my projects”). *Import from templates-bank folder* pulls in `technical/`, `financial/`, `company/` and `cvs/` |
+| **Proposal workspace** | On every proposal: technical sections (standard UN/World Bank structure or custom), each written by hand or **drafted / improved with AI** from the TOR, team, references, company profile and the two most similar past proposals — AI is told never to invent facts and leaves [placeholders] |
+| **Team & experience** | Pick experts per position (positions suggested from the TOR's key experts) with input days; tick past assignments to cite |
+| **Financial builder** | Fees, travel, per diem and other costs; fee lines generated from the team (rates converted with Settings FX); tax %; total pushed to the proposal value |
+| **Export** | Branded Word files: technical proposal (cover, numbered sections, team table, expert summaries, experience) and financial proposal (category subtotals, total in words, signature block) |
+
+Who can edit: admins and project managers; anyone with a task on the proposal; Accounts can also edit the financial proposal.
+
 ## Proposal team workflow
 
 | Step | What happens |
@@ -76,6 +88,4 @@ Back up the `pgdata` and `uploads` Docker volumes (e.g. nightly `pg_dump` + rsyn
 
 ## Roadmap
 
-- **Phase 3 – Proposal engine:** template library from `templates-bank/`, CV bank,
-  financial proposal builder, Word/PDF export, AI drafting.
 - **Phase 4:** EMD / bank-guarantee tracker, cash-flow forecast, Tally export, 2FA, backups UI.
