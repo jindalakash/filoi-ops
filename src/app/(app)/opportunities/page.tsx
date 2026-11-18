@@ -5,7 +5,8 @@ import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { PageHeader, Card, Empty } from "@/components/ui";
 import { StatusBadge, OPP_STATUS, DueDate } from "@/components/badges";
-import { money } from "@/lib/format";
+import { Amt } from "@/components/Money";
+
 import type { OpportunityStatus, Prisma } from "@prisma/client";
 
 export const metadata = { title: "Proposals" };
@@ -57,7 +58,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
                     <td><StatusBadge map={OPP_STATUS} value={o.status} /></td>
                     <td><DueDate value={o.submissionDeadline} done={!["DRAFT", "IN_REVIEW"].includes(o.status)} /></td>
                     <td className="text-ink-soft">{o.owner?.name ?? "—"}</td>
-                    <td className="text-right tabular-nums">{o.estimatedValue ? money(o.estimatedValue, o.currency) : "—"}</td>
+                    <td className="text-right tabular-nums">{o.estimatedValue ? <Amt v={o.estimatedValue} c={o.currency} /> : "—"}</td>
                   </tr>
                 ))}
               </tbody>

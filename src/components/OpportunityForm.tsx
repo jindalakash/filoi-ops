@@ -8,19 +8,24 @@ import type { Opportunity } from "@prisma/client";
 
 type Opt = { id: string; name: string };
 
-export function OpportunityForm({ o, clients, users, cancel }: { o?: Opportunity; clients: Opt[]; users: Opt[]; cancel: string }) {
+export type NewClientHint = { name: string; shortName?: string | null; country?: string | null };
+
+export function OpportunityForm({ o, clients, users, cancel, newClient, intakeId }: { o?: Partial<Opportunity>; clients: Opt[]; users: Opt[]; cancel: string; newClient?: NewClientHint; intakeId?: string }) {
   const dt = (d?: Date | null) => (d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
   return (
     <ActionForm action={saveOpportunity}>
-      {o && <input type="hidden" name="id" value={o.id} />}
+      {o?.id && <input type="hidden" name="id" value={o.id} />}
+      {intakeId && <input type="hidden" name="intakeId" value={intakeId} />}
+      {newClient && <><input type="hidden" name="newClientName" value={newClient.name} /><input type="hidden" name="newClientShortName" value={newClient.shortName ?? ""} /><input type="hidden" name="newClientCountry" value={newClient.country ?? ""} /></>}
       <div className="space-y-8">
         <section>
           <h3 className="mb-3 text-sm font-semibold text-plum">Basics</h3>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Assignment / tender title *" className="sm:col-span-2 lg:col-span-3"><input name="title" required defaultValue={o?.title} className="input" placeholder="Technical support for DHIS2 implementation in…" /></Field>
             <Field label="Client *" hint={undefined}>
-              <select name="clientId" required defaultValue={o?.clientId ?? ""} className="input">
+              <select name="clientId" required defaultValue={o?.clientId ?? (newClient ? "__new__" : "")} className="input">
                 <option value="" disabled>Select client…</option>
+                {newClient && <option value="__new__">+ Add new client: {newClient.name}</option>}
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <Link href="/clients/new?returnTo=/opportunities/new" className="mt-1 inline-block text-xs link">+ Add a new client</Link>
@@ -63,7 +68,7 @@ export function OpportunityForm({ o, clients, users, cancel }: { o?: Opportunity
           </div>
         </section>
       </div>
-      <FormFooter label={o ? "Save changes" : "Create proposal"} cancel={cancel} />
+      <FormFooter label={o?.id ? "Save changes" : "Create proposal"} cancel={cancel} />
     </ActionForm>
   );
 }

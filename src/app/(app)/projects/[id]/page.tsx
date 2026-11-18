@@ -11,7 +11,12 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { DeliverableForm, MilestoneForm, DL_TYPES } from "@/components/ProjectParts";
 import { setDeliverableStatus, deleteDeliverable, deleteProject } from "@/app/actions/projects";
 import { deleteMilestone } from "@/app/actions/finance";
-import { money, date, num, splitEmails } from "@/lib/format";
+import { Amt } from "@/components/Money";
+import { date, num, splitEmails } from "@/lib/format";
+import { aiReady } from "@/lib/ai/run";
+import { IntakeUploader } from "@/components/IntakeUploader";
+import { analyzeContract } from "@/app/actions/intake";
+import { Sparkles } from "lucide-react";
 
 export default async function ProjectPage({ params, searchParams }: PageProps<"/projects/[id]">) {
   const user = await requireUser();
@@ -34,6 +39,15 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const finEdit = can(user.role, "finance");
   const users = editPM ? await db.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : [];
 
+  const ready = editPM && (await aiReady());
+  const contractDocs = p.documents.filter((d) => d.category === "CONTRACT" || d.category === "PURCHASE_ORDER");
+  const aiCard = ready ? (
+    <Card title={<span className="flex items-center gap-2"><Sparkles size={16} className="text-plum" /> Read the contract with AI</span>}>
+      <p className="mb-3 text-sm text-ink-soft">Finds deliverables, due dates and the payment schedule. You review everything before it&apos;s added.</p>
+      <IntakeUploader action={analyzeContract} hidden={{ projectId: id }} existing={contractDocs.map((d) => ({ id: d.id, fileName: d.fileName }))} label="Read contract" hint="Contract, PO or amendment · PDF, Word .docx or text" />
+    </Card>
+  ) : null;
+  const applied = typeof sp.applied === "string" ? sp.applied.split("-").map(Number) : null;
   const cv = num(p.contractValue);
   const live = p.invoices.filter((i) => i.status !== "CANCELLED" && i.status !== "DRAFT");
   const invoiced = live.reduce((a, i) => a + num(i.subtotal), 0);
@@ -61,14 +75,15 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           {can(user.role, "admin") && <ConfirmAction action={deleteProject} fields={{ id }} label="Delete" confirm="Delete this project, its deliverables and files?" className="btn-danger" />}
         </>}
       />
+      {applied && <div className="mb-5"><Notice tone="ok">Added {applied[0]} deliverable(s) and {applied[1]} billing milestone(s) from the contract.</Notice></div>}
       {sp.created && <div className="mb-5"><Notice tone="ok">Project created from the proposal. Next: upload the contract / PO in <b>Contract & files</b>, then add deliverables and billing milestones.</Notice></div>}
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Deliverables" value={`${dlDone}/${p.deliverables.length}`} hint="accepted" tone="plum" />
         <Stat label="Ends" value={<span className="text-xl">{date(p.endDate)}</span>} hint={p.startDate ? `Started ${date(p.startDate)}` : undefined} tone="ink" />
         {fin ? <>
-          <Stat label="Contract value" value={money(cv, p.currency, { compact: true })} hint={`${money(cv - invoiced, p.currency, { compact: true })} yet to invoice`} tone="sky" />
-          <Stat label="Received" value={money(received, p.currency, { compact: true })} hint={`${money(Math.max(0, invoicedGross - received), p.currency, { compact: true })} outstanding`} tone="green" />
+          <Stat label="Contract value" value={<Amt v={cv} c={p.currency} compact />} hint={<><Amt v={cv - invoiced} c={p.currency} compact /> yet to invoice</>} tone="sky" />
+          <Stat label="Received" value={<Amt v={received} c={p.currency} compact />} hint={<><Amt v={Math.max(0, invoicedGross - received)} c={p.currency} compact /> outstanding</>} tone="green" />
         </> : <>
           <Stat label="Manager" value={<span className="text-base leading-snug">{p.manager?.name ?? "—"}</span>} tone="sky" />
           <Stat label="Contract no." value={<span className="break-all text-base leading-snug">{p.contractNo ?? "—"}</span>} tone="sun" />
@@ -85,7 +100,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
             </Disclosure>
           )}
           <Card pad={false}>
-            {p.deliverables.length === 0 ? <Empty title="No deliverables yet">Add each output from the contract — reports, systems, trainings — with its due date.</Empty> : (
+            {p.deliverables.length === 0 ? <Empty title="No deliverables yet">Add each output from the contract — reports, systems, trainings — with its due date.{ready && <> Or let AI read the contract in <a className="link" href="?tab=documents">Contract &amp; files</a>.</>}</Empty> : (
               <ul className="divide-y divide-line">
                 {p.deliverables.map((d) => (
                   <li key={d.id} className="p-4">
@@ -94,7 +109,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold">{d.title}</span>
                           <Badge tone="navy">{typeLabel[d.type]}</Badge>
-                          {fin && d.milestones.map((m) => <Badge key={m.id} tone="purple">{money(m.amount, p.currency)}</Badge>)}
+                          {fin && d.milestones.map((m) => <Badge key={m.id} tone="purple"><Amt v={m.amount} c={p.currency} compact /></Badge>)}
                         </div>
                         {d.description && <p className="mt-1 text-sm text-ink-soft">{d.description}</p>}
                         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft">
@@ -128,9 +143,9 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
 
       {tab === "billing" && fin && (
         <div className="space-y-6">
-          <Card title="Payment schedule" actions={<span className="text-xs text-ink-soft">Scheduled {money(scheduled, p.currency)} of {money(cv, p.currency)}</span>}>
+          <Card title="Payment schedule" actions={<span className="text-xs text-ink-soft">Scheduled <Amt v={scheduled} c={p.currency} /> of <Amt v={cv} c={p.currency} /></span>}>
             {Math.abs(scheduled - cv) > 0.5 && cv > 0 && (
-              <div className="mb-4"><Notice tone="warn">Milestones add up to {money(scheduled, p.currency)}, contract value is {money(cv, p.currency)} — difference {money(cv - scheduled, p.currency)}.</Notice></div>
+              <div className="mb-4"><Notice tone="warn">Milestones add up to <Amt v={scheduled} c={p.currency} />, contract value is <Amt v={cv} c={p.currency} /> — difference <Amt v={cv - scheduled} c={p.currency} />.</Notice></div>
             )}
             <div className="mb-4"><Progress value={cv ? (invoiced / cv) * 100 : 0} tone="sky" /><div className="mt-1 text-xs text-ink-soft">{cv ? Math.round((invoiced / cv) * 100) : 0}% invoiced</div></div>
             {p.milestones.length === 0 ? <Empty title="No billing milestones">Add the payment schedule from the contract (e.g. 20% on inception report).</Empty> : (
@@ -143,7 +158,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                         <td className="font-semibold">{m.title}{m.percent && <span className="ml-1 text-xs font-normal text-ink-soft">({num(m.percent)}%)</span>}</td>
                         <td className="text-ink-soft">{m.deliverable?.title ?? "—"}{m.deliverable && <div><StatusBadge map={DL_STATUS} value={m.deliverable.status} /></div>}</td>
                         <td><DueDate value={m.dueDate} done={m.status !== "PLANNED"} /></td>
-                        <td className="text-right tabular-nums">{money(m.amount, p.currency)}</td>
+                        <td className="text-right tabular-nums"><Amt v={m.amount} c={p.currency} /></td>
                         <td><StatusBadge map={MS_STATUS} value={m.status} /></td>
                         <td className="text-right whitespace-nowrap">
                           {finEdit && m.status === "PLANNED" && <Link href={`/finance/invoices/new?milestoneId=${m.id}`} className="btn-primary btn-sm">Raise invoice</Link>}
@@ -165,7 +180,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                 <tbody>{p.invoices.map((i) => (
                   <tr key={i.id}><td><Link className="link" href={`/finance/invoices/${i.id}`}>{i.number}</Link></td><td>{date(i.issueDate)}</td>
                     <td><DueDate value={i.dueDate} done={i.status === "PAID" || i.status === "CANCELLED"} /></td>
-                    <td className="text-right tabular-nums">{money(i.total, i.currency)}</td><td><StatusBadge map={INV_STATUS} value={i.status} /></td></tr>
+                    <td className="text-right tabular-nums"><Amt v={i.total} c={i.currency} /></td><td><StatusBadge map={INV_STATUS} value={i.status} /></td></tr>
                 ))}</tbody>
               </table></div>
             )}
@@ -174,8 +189,11 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
       )}
 
       {tab === "documents" && (
+        <div className="space-y-6">
+        {aiCard}
         <Documents docs={p.documents} link={{ projectId: id }} path={`/projects/${id}`} defaultCategory="CONTRACT" title="Contract, PO & project files"
           categories={["CONTRACT", "PURCHASE_ORDER", "DELIVERABLE", "INVOICE", "CORRESPONDENCE", "OTHER"]} />
+        </div>
       )}
 
       {tab === "overview" && (

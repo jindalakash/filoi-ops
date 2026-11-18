@@ -10,7 +10,8 @@ import { Card, Stat, Empty, Notice } from "@/components/ui";
 import { StatusBadge, DL_STATUS, OPP_STATUS, DueDate } from "@/components/badges";
 import { MultiMoney, Breakdown } from "@/components/Money";
 import { ColumnChart } from "@/components/ColumnChart";
-import { money, num } from "@/lib/format";
+import { Amt } from "@/components/Money";
+import { num } from "@/lib/format";
 
 export const metadata = { title: "Dashboard" };
 
@@ -82,7 +83,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               {overdueInv.map((i) => (
                 <tr key={i.id}><td><Link className="link" href={`/finance/invoices/${i.id}`}>{i.number}</Link></td><td>{i.client.shortName || i.client.name}</td>
                   <td><DueDate value={i.dueDate} /></td>
-                  <td className="text-right tabular-nums">{money(num(i.total) - i.payments.reduce((a, p) => a + num(p.amount) + num(p.tds) + num(p.bankCharges), 0), i.currency)}</td></tr>
+                  <td className="text-right tabular-nums"><Amt v={num(i.total) - i.payments.reduce((a, p) => a + num(p.amount) + num(p.tds) + num(p.bankCharges), 0)} c={i.currency} /></td></tr>
               ))}
             </tbody></table></div>
           </Card>

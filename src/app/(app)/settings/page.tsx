@@ -134,16 +134,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       {tab === "ai" && (
         <div className="grid max-w-5xl gap-6 lg:grid-cols-3">
           <Card title="AI provider" className="lg:col-span-2">
-            <div className="mb-4"><Notice>AI is optional. In Phase 2 it will read uploaded TORs and contracts and pre-fill proposals, deliverables and payment schedules for you to review. Keys are stored encrypted in your own database.</Notice></div>
+            <div className="mb-4"><Notice>AI is optional. When enabled, it reads uploaded TORs / RFPs and contracts and pre-fills proposals, deliverables and payment schedules for you to review. Documents are sent only to the provider you choose; keys are stored encrypted in your own database. Claude and Gemini also read scanned PDFs; OpenAI and Ollama need PDFs with a text layer.</Notice></div>
             <ActionForm action={saveAi}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="flex items-center gap-2 text-sm font-semibold sm:col-span-2"><input type="checkbox" name="enabled" defaultChecked={ai.enabled} className="h-4 w-4 accent-plum" /> Enable AI features</label>
                 <Field label="Provider">
                   <select name="provider" defaultValue={ai.provider} className="input">
-                    <option value="anthropic">Anthropic Claude (recommended for PDFs)</option><option value="openai">OpenAI</option><option value="gemini">Google Gemini</option><option value="ollama">Ollama (local, free)</option>
+                    <option value="anthropic">Anthropic Claude (recommended — reads scanned PDFs)</option><option value="openai">OpenAI</option><option value="gemini">Google Gemini</option><option value="ollama">Ollama (local, free)</option>
                   </select>
                 </Field>
-                <Field label="Model"><input name="model" defaultValue={ai.model} className="input" list="models" />
+                <Field label="Model" hint="Claude: claude-opus-5-5 (best), claude-sonnet-5-5 or claude-haiku-5-5 (cheaper)"><input name="model" defaultValue={ai.model} className="input" list="models" />
                   <datalist id="models">{Object.values(MODELS).flat().map((m) => <option key={m} value={m} />)}</datalist>
                 </Field>
                 <Field label="API key" hint={ai.apiKeyEnc ? `Saved: ${mask(decrypt(ai.apiKeyEnc))} — leave blank to keep` : "Not needed for Ollama"}><input name="apiKey" type="password" className="input" autoComplete="off" /></Field>

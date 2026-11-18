@@ -8,6 +8,7 @@ import { financeSnapshot, sumINR } from "@/lib/metrics";
 import { PageHeader, Card, Stat, Empty } from "@/components/ui";
 import { StatusBadge, INV_STATUS, DueDate } from "@/components/badges";
 import { MultiMoney, Breakdown } from "@/components/Money";
+import { Amt } from "@/components/Money";
 import { money, date, num, daysFromNow } from "@/lib/format";
 import type { InvoiceStatus } from "@prisma/client";
 
@@ -46,7 +47,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                 <tr key={m.id}>
                   <td><div className="font-semibold">{m.title}</div><div className="text-xs text-ink-soft">{m.project.code} · {m.project.client.shortName || m.project.client.name}{m.deliverable && ` · ${m.deliverable.title}`}</div></td>
                   <td><DueDate value={m.dueDate} /></td>
-                  <td className="text-right tabular-nums">{money(m.amount, m.project.currency)}</td>
+                  <td className="text-right tabular-nums"><Amt v={m.amount} c={m.project.currency} /></td>
                   <td className="text-right">{can(user.role, "finance") && <Link href={`/finance/invoices/new?milestoneId=${m.id}`} className="btn-primary btn-sm">Invoice</Link>}</td>
                 </tr>
               ))}</tbody>
@@ -84,8 +85,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                   <td>{i.client.shortName || i.client.name}<div className="text-xs text-ink-soft">{i.project.code}</div></td>
                   <td>{date(i.issueDate)}</td>
                   <td><DueDate value={i.dueDate} done={["PAID", "CANCELLED", "DRAFT"].includes(i.status)} /></td>
-                  <td className="text-right tabular-nums">{money(i.total, i.currency)}</td>
-                  <td className="text-right tabular-nums">{i.status === "CANCELLED" ? "—" : money(bal, i.currency)}</td>
+                  <td className="text-right tabular-nums"><Amt v={i.total} c={i.currency} /></td>
+                  <td className="text-right tabular-nums">{i.status === "CANCELLED" ? "—" : <Amt v={bal} c={i.currency} />}</td>
                   <td><StatusBadge map={INV_STATUS} value={i.status} /></td>
                 </tr>
               );

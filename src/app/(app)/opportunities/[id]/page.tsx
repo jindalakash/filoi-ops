@@ -9,7 +9,12 @@ import { AutoSelect, ConfirmAction } from "@/components/client";
 import { Documents } from "@/components/Documents";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { setOpportunityStatus, convertToProject, deleteOpportunity } from "@/app/actions/opportunities";
-import { money, date, splitEmails } from "@/lib/format";
+import { Amt } from "@/components/Money";
+import { date, splitEmails } from "@/lib/format";
+import { aiReady } from "@/lib/ai/run";
+import { IntakeUploader } from "@/components/IntakeUploader";
+import { analyzeTender } from "@/app/actions/intake";
+import { Sparkles } from "lucide-react";
 
 export default async function OpportunityPage({ params }: PageProps<"/opportunities/[id]">) {
   const user = await requireUser();
@@ -20,6 +25,8 @@ export default async function OpportunityPage({ params }: PageProps<"/opportunit
   });
   if (!o) notFound();
   const edit = can(user.role, "presales");
+  const ready = edit && (await aiReady());
+  const tenderDocs = o.documents.filter((d) => d.category === "TOR" || d.category === "RFP");
   const docsNeeded = (o.requiredDocuments ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
 
   return (
@@ -55,9 +62,9 @@ export default async function OpportunityPage({ params }: PageProps<"/opportunit
               ["Pre-bid meeting", date(o.preBidDate)],
               ["Reference no.", o.referenceNo],
               ["Source", o.source],
-              ["Proposed value", o.estimatedValue ? money(o.estimatedValue, o.currency) : "—"],
+              ["Proposed value", o.estimatedValue ? <Amt key="v" v={o.estimatedValue} c={o.currency} /> : "—"],
               ["Duration", o.durationMonths ? `${o.durationMonths} months` : "—"],
-              ["EMD / bid security", o.emdAmount ? money(o.emdAmount, o.currency) : "—"],
+              ["EMD / bid security", o.emdAmount ? <Amt key="e" v={o.emdAmount} c={o.currency} /> : "—"],
               ["Evaluation", [o.evaluationMethod, o.technicalWeight != null && `${o.technicalWeight}:${o.financialWeight ?? 100 - o.technicalWeight}`].filter(Boolean).join(" · ") || "—"],
               ["Owner", o.owner?.name],
               ["Submitted on", date(o.submittedAt)],
@@ -76,6 +83,12 @@ export default async function OpportunityPage({ params }: PageProps<"/opportunit
             title="TOR, RFP & proposal files" />
         </div>
         <div className="space-y-6">
+          {ready && (
+            <Card title={<span className="flex items-center gap-2"><Sparkles size={16} className="text-plum" /> Read the tender with AI</span>}>
+              <p className="mb-3 text-sm text-ink-soft">Fills in empty fields (deadlines, scope, eligibility, documents to submit) for you to review.</p>
+              <IntakeUploader action={analyzeTender} hidden={{ opportunityId: id }} existing={tenderDocs.map((d) => ({ id: d.id, fileName: d.fileName }))} label="Read with AI" />
+            </Card>
+          )}
           <Card title="Submission checklist">
             {docsNeeded.length === 0 ? <p className="text-sm text-ink-soft">Add “Documents to submit” in Edit to build a checklist.</p> : (
               <ul className="space-y-2">

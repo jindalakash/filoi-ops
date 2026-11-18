@@ -17,6 +17,15 @@ payments (with TDS) and sends email reminders before anything is due.
 | **Users** | Unlimited users, roles Admin / Project Manager / Accounts Manager, reset password, deactivate |
 | **Settings** | Company & GST (GSTIN, LUT ARN, SAC, bank details, invoice prefix), SMTP email, reminder schedule, exchange rates, AI provider + key (encrypted; used from Phase 2) |
 
+## Phase 2 — AI intake (in this version)
+
+| Area | Features |
+|---|---|
+| **TOR / RFP intake** | New proposal starts with an upload. AI reads the tender (PDF incl. scanned, Word, text) and pre-fills title, client (matched or created), reference, deadlines, budget, duration, EMD, evaluation weights, scope, eligibility, documents to submit, expected deliverables, key experts and watch-outs — with verbatim evidence quotes. Nothing is saved until you confirm. Also available on existing proposals ("Read the tender with AI", fills empty fields only) |
+| **Contract / PO intake** | On a project's *Contract & files* tab: AI reads the contract and proposes contract no./dates/value, deliverables with due dates and the payment schedule linked to deliverables. Tick what to create on the review screen |
+| **Providers** | Settings → AI: Anthropic Claude (default `claude-opus-5-5`, reads scanned PDFs, refusal fallback enabled), OpenAI, Google Gemini, or a free local model via Ollama (text PDFs only) |
+| **INR everywhere** | Every amount in USD/EUR is shown in ₹ (Settings → Currencies rates) with the original amount in brackets, e.g. ₹80.6L ($96K). Printed invoices stay in the invoice currency |
+
 ### Roles
 
 | | Admin | Project Manager | Accounts Manager |
@@ -56,8 +65,6 @@ Back up the `pgdata` and `uploads` Docker volumes (e.g. nightly `pg_dump` + rsyn
 
 ## Roadmap
 
-- **Phase 2 – Smart intake:** upload a TOR/RFP or contract → AI extracts dates, deliverables,
-  payment schedule into a review screen (Claude / OpenAI / Gemini / local Ollama).
 - **Phase 3 – Proposal engine:** template library from `templates-bank/`, CV bank,
   financial proposal builder, Word/PDF export, AI drafting.
 - **Phase 4:** EMD / bank-guarantee tracker, cash-flow forecast, Tally export, 2FA, backups UI.

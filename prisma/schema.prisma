@@ -355,3 +355,28 @@ model NotificationLog {
   error      String?
   createdAt  DateTime @default(now())
 }
+
+// ───────────────────────── AI intake (Phase 2) ─────────────────────────
+
+enum ExtractionKind {
+  TENDER // TOR / RFP → proposal
+  CONTRACT // contract / PO → deliverables & payment schedule
+}
+
+/// One AI reading of one or more uploaded documents, kept for review & audit.
+model AiExtraction {
+  id            String         @id @default(cuid())
+  kind          ExtractionKind
+  status        String         @default("READY") // READY | APPLIED | DISCARDED
+  result        Json
+  documentIds   String[]
+  provider      String
+  model         String
+  inputTokens   Int?
+  outputTokens  Int?
+  opportunityId String?
+  projectId     String?
+  createdById   String?
+  createdAt     DateTime       @default(now())
+  appliedAt     DateTime?
+}

@@ -14,9 +14,17 @@ export async function saveOpportunity(_: ActionState, fd: FormData): Promise<Act
   const user = await requireUser("presales");
   return guard(async () => {
     const id = str(fd, "id");
+    let clientId = req(fd, "clientId", "Client");
+    if (clientId === "__new__") {
+      const c = await db.client.create({
+        data: { name: req(fd, "newClientName", "New client name"), shortName: str(fd, "newClientShortName"), country: str(fd, "newClientCountry") || "Switzerland", defaultCurrency: str(fd, "currency") || "USD" },
+      });
+      await logActivity(user.id, "create", "client", c.id, `Added client ${c.name} (from TOR)`);
+      clientId = c.id;
+    }
     const d = {
       title: req(fd, "title", "Title"),
-      clientId: req(fd, "clientId", "Client"),
+      clientId,
       source: str(fd, "source"),
       referenceNo: str(fd, "referenceNo"),
       currency: str(fd, "currency") || "USD",
@@ -40,6 +48,15 @@ export async function saveOpportunity(_: ActionState, fd: FormData): Promise<Act
       ? await db.opportunity.update({ where: { id }, data: d })
       : await db.opportunity.create({ data: { ...d, code: await nextOpportunityCode(), ownerId: d.ownerId ?? user.id } });
     await logActivity(user.id, id ? "update" : "create", "opportunity", o.id, `${id ? "Updated" : "Created"} proposal ${o.code}`);
+    // documents read by AI on the intake screen now belong to this proposal
+    const intakeId = str(fd, "intakeId");
+    if (intakeId) {
+      const x = await db.aiExtraction.findUnique({ where: { id: intakeId } });
+      if (x && x.status === "READY") {
+        await db.document.updateMany({ where: { id: { in: x.documentIds }, opportunityId: null, projectId: null }, data: { opportunityId: o.id } });
+        await db.aiExtraction.update({ where: { id: intakeId }, data: { status: "APPLIED", appliedAt: new Date(), opportunityId: o.id } });
+      }
+    }
     revalidatePath("/opportunities");
     redirect(`/opportunities/${o.id}`);
   });

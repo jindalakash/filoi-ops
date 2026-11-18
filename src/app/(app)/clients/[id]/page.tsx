@@ -8,7 +8,8 @@ import { StatusBadge, OPP_STATUS, PROJECT_STATUS } from "@/components/badges";
 import { ConfirmAction } from "@/components/client";
 import { CLIENT_TYPES } from "@/components/forms";
 import { deleteClient } from "@/app/actions/clients";
-import { money, date } from "@/lib/format";
+import { Amt } from "@/components/Money";
+import { date } from "@/lib/format";
 
 export default async function ClientPage({ params }: PageProps<"/clients/[id]">) {
   const user = await requireUser();
@@ -43,7 +44,7 @@ export default async function ClientPage({ params }: PageProps<"/clients/[id]">)
             <div className="overflow-x-auto"><table className="table"><tbody>
               {c.opportunities.map((o) => (
                 <tr key={o.id}><td className="text-xs text-ink-soft">{o.code}</td><td><Link className="link" href={`/opportunities/${o.id}`}>{o.title}</Link></td>
-                  <td><StatusBadge map={OPP_STATUS} value={o.status} /></td><td className="text-right">{o.estimatedValue ? money(o.estimatedValue, o.currency) : ""}</td></tr>
+                  <td><StatusBadge map={OPP_STATUS} value={o.status} /></td><td className="text-right">{o.estimatedValue ? <Amt v={o.estimatedValue} c={o.currency} /> : ""}</td></tr>
               ))}
             </tbody></table></div>
           )}
@@ -54,7 +55,7 @@ export default async function ClientPage({ params }: PageProps<"/clients/[id]">)
               {c.projects.map((p) => (
                 <tr key={p.id}><td className="text-xs text-ink-soft">{p.code}</td><td><Link className="link" href={`/projects/${p.id}`}>{p.title}</Link></td>
                   <td><StatusBadge map={PROJECT_STATUS} value={p.status} /></td><td className="text-ink-soft">{date(p.endDate)}</td>
-                  <td className="text-right">{fin ? money(p.contractValue, p.currency) : ""}</td></tr>
+                  <td className="text-right">{fin ? <Amt v={p.contractValue} c={p.currency} /> : ""}</td></tr>
               ))}
             </tbody></table></div>
           )}

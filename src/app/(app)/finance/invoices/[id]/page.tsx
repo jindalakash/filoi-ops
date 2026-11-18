@@ -8,6 +8,7 @@ import { StatusBadge, INV_STATUS, DueDate } from "@/components/badges";
 import { ActionForm, ConfirmAction, SubmitButton } from "@/components/client";
 import { setInvoiceStatus, deleteInvoice, recordPayment, deletePayment } from "@/app/actions/finance";
 import { SUPPLY_LABEL } from "@/lib/tax";
+import { Amt } from "@/components/Money";
 import { money, date, num, inputDate } from "@/lib/format";
 
 export default async function InvoicePage({ params }: PageProps<"/finance/invoices/[id]">) {
@@ -39,8 +40,8 @@ export default async function InvoicePage({ params }: PageProps<"/finance/invoic
           <Card title="Summary">
             <KV items={[
               ["Invoice date", date(inv.issueDate)], ["Payment due", <DueDate key="d" value={inv.dueDate} done={inv.status === "PAID" || inv.status === "CANCELLED"} />],
-              ["GST treatment", SUPPLY_LABEL[inv.supplyType]], ["Taxable value", money(inv.subtotal, c)],
-              ["GST", money(num(inv.cgst) + num(inv.sgst) + num(inv.igst), c)], ["Invoice total", <b key="t">{money(inv.total, c)}</b>],
+              ["GST treatment", SUPPLY_LABEL[inv.supplyType]], ["Taxable value", <Amt key="s" v={inv.subtotal} c={c} />],
+              ["GST", <Amt key="g" v={num(inv.cgst) + num(inv.sgst) + num(inv.igst)} c={c} />], ["Invoice total", <b key="t"><Amt v={inv.total} c={c} /></b>],
               ["Exchange rate", c === "INR" ? "—" : `1 ${c} = ₹${num(inv.exchangeRate)}`], ["Milestone", inv.milestone?.title], ["PO / contract", inv.poReference],
             ]} />
           </Card>
@@ -56,15 +57,15 @@ export default async function InvoicePage({ params }: PageProps<"/finance/invoic
         <div className="space-y-6">
           <Card title="Payments">
             <div className="mb-4 space-y-2 text-sm">
-              <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2.5"><span className="text-emerald-800">Settled</span><span className="font-display font-semibold tabular-nums text-emerald-900">{money(settled, c)}</span></div>
-              <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2.5"><span className="text-amber-800">Balance</span><span className="font-display font-semibold tabular-nums text-amber-900">{money(balance, c)}</span></div>
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2.5"><span className="text-emerald-800">Settled</span><span className="font-display font-semibold tabular-nums text-emerald-900"><Amt v={settled} c={c} /></span></div>
+              <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2.5"><span className="text-amber-800">Balance</span><span className="font-display font-semibold tabular-nums text-amber-900"><Amt v={balance} c={c} /></span></div>
             </div>
             {inv.payments.length === 0 ? <Empty title="No payments yet" /> : (
               <ul className="divide-y divide-line text-sm">
                 {inv.payments.map((p) => (
                   <li key={p.id} className="flex items-start justify-between gap-2 py-2.5">
                     <div>
-                      <div className="font-semibold">{money(p.amount, c)} <span className="font-normal text-ink-soft">on {date(p.date)}</span></div>
+                      <div className="font-semibold"><Amt v={p.amount} c={c} /> <span className="font-normal text-ink-soft">on {date(p.date)}</span></div>
                       <div className="text-xs text-ink-soft">
                         {num(p.tds) > 0 && `TDS ${money(p.tds, c)} · `}{num(p.bankCharges) > 0 && `Bank charges ${money(p.bankCharges, c)} · `}
                         {c !== "INR" && `@ ₹${num(p.exchangeRate)} · `}{p.reference}

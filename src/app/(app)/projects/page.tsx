@@ -5,7 +5,8 @@ import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { PageHeader, Card, Empty, Progress } from "@/components/ui";
 import { StatusBadge, PROJECT_STATUS, DueDate } from "@/components/badges";
-import { money, num } from "@/lib/format";
+import { Amt } from "@/components/Money";
+import { num } from "@/lib/format";
 import type { ProjectStatus } from "@prisma/client";
 
 export const metadata = { title: "Projects" };
@@ -54,7 +55,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 </div>
                 {fin && num(p.contractValue) > 0 && (
                   <div className="mt-3 space-y-1.5">
-                    <div className="flex justify-between text-xs text-ink-soft"><span>Invoiced</span><span>{money(invoiced, p.currency, { compact: true })} / {money(p.contractValue, p.currency, { compact: true })}</span></div>
+                    <div className="flex justify-between text-xs text-ink-soft"><span>Invoiced</span><span className="text-right"><Amt v={invoiced} c={p.currency} compact /> / <Amt v={p.contractValue} c={p.currency} compact /></span></div>
                     <Progress value={(invoiced / num(p.contractValue)) * 100} tone="sky" />
                   </div>
                 )}

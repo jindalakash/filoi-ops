@@ -73,7 +73,7 @@ const DEFAULTS = {
   smtp: { host: "", port: 587, secure: false, user: "", passwordEnc: "", fromName: "Filoi Ops", fromEmail: "" } as SmtpSettings,
   reminders: { enabled: true, defaultDays: "5,2,0", overdueDays: "1,7,14", hour: 8, digestEmails: "" } as ReminderSettings,
   fx: { USD: 84, EUR: 91, INR: 1 } as FxSettings,
-  ai: { enabled: false, provider: "anthropic", model: "claude-sonnet-5-5", apiKeyEnc: "", baseUrl: "" } as AiSettings,
+  ai: { enabled: false, provider: "anthropic", model: "claude-opus-5-5", apiKeyEnc: "", baseUrl: "" } as AiSettings,
 };
 
 type Defaults = typeof DEFAULTS;
