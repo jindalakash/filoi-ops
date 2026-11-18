@@ -1,0 +1,357 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Users ─────────────────────────
+
+enum Role {
+  ADMIN
+  PROJECT_MANAGER
+  ACCOUNTS
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(PROJECT_MANAGER)
+  active       Boolean   @default(true)
+  phone        String?
+  designation  String?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  opportunities Opportunity[] @relation("OpportunityOwner")
+  projects      Project[]     @relation("ProjectManager")
+  deliverables  Deliverable[] @relation("DeliverableOwner")
+  documents     Document[]
+  activities    Activity[]
+}
+
+// ───────────────────────── Clients ─────────────────────────
+
+enum ClientType {
+  UN_AGENCY
+  MULTILATERAL
+  INTERNATIONAL_NGO
+  GOVERNMENT
+  PRIVATE
+  NGO
+  OTHER
+}
+
+model Client {
+  id              String     @id @default(cuid())
+  name            String
+  shortName       String?
+  type            ClientType @default(UN_AGENCY)
+  country         String     @default("Switzerland")
+  address         String?
+  gstin           String?
+  stateCode       String? // GST state code for Indian clients, e.g. "07"
+  taxId           String? // foreign tax / vendor number
+  vendorNumber    String? // our supplier number with this client
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  defaultCurrency String     @default("USD")
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  opportunities Opportunity[]
+  projects      Project[]
+  invoices      Invoice[]
+}
+
+// ───────────────────────── Pre-sales ─────────────────────────
+
+enum OpportunityStatus {
+  DRAFT
+  IN_REVIEW
+  SUBMITTED
+  UNDER_EVALUATION
+  WON
+  LOST
+  CANCELLED
+  NO_GO
+}
+
+model Opportunity {
+  id                 String            @id @default(cuid())
+  code               String            @unique
+  title              String
+  clientId           String
+  client             Client            @relation(fields: [clientId], references: [id])
+  status             OpportunityStatus @default(DRAFT)
+  source             String? // UNGM, client email, website...
+  referenceNo        String?
+  currency           String            @default("USD")
+  estimatedValue     Decimal?          @db.Decimal(16, 2) // value we quote / propose
+  technicalWeight    Int? // e.g. 80 in an 80:20 QCBS
+  financialWeight    Int?
+  evaluationMethod   String?
+  submissionDeadline DateTime?
+  preBidDate         DateTime?
+  queryDeadline      DateTime?
+  durationMonths     Int?
+  emdAmount          Decimal?          @db.Decimal(16, 2)
+  scopeSummary       String?
+  eligibility        String?
+  requiredDocuments  String? // one per line
+  notes              String?
+  alertEmails        String? // comma separated
+  ownerId            String?
+  owner              User?             @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  submittedAt        DateTime?
+  decisionAt         DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  project   Project?
+  documents Document[]
+}
+
+// ───────────────────────── Delivery ─────────────────────────
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  code          String        @unique
+  title         String
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id])
+  opportunityId String?       @unique
+  opportunity   Opportunity?  @relation(fields: [opportunityId], references: [id])
+  contractNo    String?
+  contractDate  DateTime?
+  contractValue Decimal       @default(0) @db.Decimal(16, 2)
+  currency      String        @default("USD")
+  startDate     DateTime?
+  endDate       DateTime?
+  status        ProjectStatus @default(ACTIVE)
+  description   String?
+  managerId     String?
+  manager       User?         @relation("ProjectManager", fields: [managerId], references: [id])
+  alertEmails   String? // comma separated
+  reminderDays  String        @default("5,2,0") // days before due date
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  deliverables Deliverable[]
+  milestones   Milestone[]
+  invoices     Invoice[]
+  documents    Document[]
+}
+
+enum DeliverableType {
+  DOCUMENT
+  SYSTEM
+  REPORT
+  TRAINING
+  DATA
+  OTHER
+}
+
+enum DeliverableStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  REVISION
+  ACCEPTED
+}
+
+model Deliverable {
+  id          String            @id @default(cuid())
+  projectId   String
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  seq         Int               @default(1)
+  title       String
+  description String?
+  type        DeliverableType   @default(DOCUMENT)
+  status      DeliverableStatus @default(NOT_STARTED)
+  dueDate     DateTime?
+  ownerId     String?
+  owner       User?             @relation("DeliverableOwner", fields: [ownerId], references: [id])
+  alertEmails String? // extra recipients on top of the project's
+  submittedAt DateTime?
+  acceptedAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  milestones Milestone[]
+  documents  Document[]
+}
+
+// ───────────────────────── Finance ─────────────────────────
+
+enum MilestoneStatus {
+  PLANNED
+  INVOICED
+  PAID
+}
+
+model Milestone {
+  id            String          @id @default(cuid())
+  projectId     String
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliverableId String?
+  deliverable   Deliverable?    @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
+  title         String
+  percent       Decimal?        @db.Decimal(6, 2)
+  amount        Decimal         @db.Decimal(16, 2)
+  dueDate       DateTime? // expected invoicing date
+  status        MilestoneStatus @default(PLANNED)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  invoices Invoice[]
+}
+
+enum SupplyType {
+  EXPORT_LUT // export of services, zero-rated under LUT (no IGST)
+  DOMESTIC_INTRA // CGST + SGST
+  DOMESTIC_INTER // IGST
+  EXEMPT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  number         String        @unique
+  projectId      String
+  project        Project       @relation(fields: [projectId], references: [id])
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  milestoneId    String?
+  milestone      Milestone?    @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  issueDate      DateTime
+  dueDate        DateTime?
+  currency       String
+  exchangeRate   Decimal       @default(1) @db.Decimal(12, 4) // 1 unit of currency in INR
+  supplyType     SupplyType
+  placeOfSupply  String?
+  taxRate        Decimal       @default(0) @db.Decimal(5, 2)
+  subtotal       Decimal       @db.Decimal(16, 2)
+  cgst           Decimal       @default(0) @db.Decimal(16, 2)
+  sgst           Decimal       @default(0) @db.Decimal(16, 2)
+  igst           Decimal       @default(0) @db.Decimal(16, 2)
+  total          Decimal       @db.Decimal(16, 2)
+  status         InvoiceStatus @default(DRAFT)
+  poReference    String?
+  notes          String?
+  sentAt         DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  items    InvoiceItem[]
+  payments Payment[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  sac         String?
+  quantity    Decimal @default(1) @db.Decimal(12, 2)
+  rate        Decimal @db.Decimal(16, 2)
+  amount      Decimal @db.Decimal(16, 2)
+}
+
+model Payment {
+  id           String   @id @default(cuid())
+  invoiceId    String
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  date         DateTime
+  amount       Decimal  @db.Decimal(16, 2) // amount received in bank (invoice currency)
+  tds          Decimal  @default(0) @db.Decimal(16, 2) // tax deducted by client
+  bankCharges  Decimal  @default(0) @db.Decimal(16, 2)
+  exchangeRate Decimal  @default(1) @db.Decimal(12, 4) // realised INR rate
+  reference    String?
+  notes        String?
+  createdAt    DateTime @default(now())
+}
+
+// ───────────────────────── Shared ─────────────────────────
+
+enum DocCategory {
+  TOR
+  RFP
+  TECHNICAL_PROPOSAL
+  FINANCIAL_PROPOSAL
+  CONTRACT
+  PURCHASE_ORDER
+  DELIVERABLE
+  INVOICE
+  CORRESPONDENCE
+  OTHER
+}
+
+model Document {
+  id            String       @id @default(cuid())
+  category      DocCategory  @default(OTHER)
+  fileName      String
+  storedName    String
+  mimeType      String?
+  size          Int
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  projectId     String?
+  project       Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliverableId String?
+  deliverable   Deliverable? @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  uploadedById  String?
+  uploadedBy    User?        @relation(fields: [uploadedById], references: [id])
+  createdAt     DateTime     @default(now())
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  summary   String
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}
+
+model NotificationLog {
+  id         String   @id @default(cuid())
+  dedupeKey  String   @unique
+  kind       String
+  subject    String
+  recipients String
+  status     String // SENT | SKIPPED | FAILED
+  error      String?
+  createdAt  DateTime @default(now())
+}

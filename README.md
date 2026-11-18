@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Filoi Ops
 
-## Getting Started
+Proposal → Project → Cash, for **Filoi Private Limited**.
 
-First, run the development server:
+Tracks tenders/RFPs, won contracts, deliverables, billing milestones, GST/LUT invoices,
+payments (with TDS) and sends email reminders before anything is due.
+
+## Phase 1 — what's in this version
+
+| Area | Features |
+|---|---|
+| **Proposals** | Tender details, deadlines, evaluation (QCBS weights), EMD, scope, eligibility, submission checklist, TOR/RFP/proposal file uploads, status pipeline Draft → Review → Submitted → Evaluation → Won/Lost, one-click *Create project* when won |
+| **Projects** | Contract/PO details, deliverables (type, owner, due date, status, acceptance), contract & file storage, activity log |
+| **Finance** | Billing milestones (amount or % of contract, linked to deliverables), invoices (export under LUT / IGST / CGST+SGST), USD · EUR · INR with exchange rates, printable invoice (Save as PDF), payments with TDS & bank charges, receivables ageing |
+| **Reminders** | Daily email for deliverables, invoices to raise, payments due/overdue and proposal deadlines — days configurable per project (default 5, 2, 0 days before + 1, 7, 14 days overdue). Multiple alert emails per project / proposal / deliverable |
+| **Dashboards** | Role-aware: proposal counts & win rate for everyone; contract value, awaiting award, yet-to-invoice, received, outstanding, 6-month invoicing forecast & collections for Admin/Accounts |
+| **Users** | Unlimited users, roles Admin / Project Manager / Accounts Manager, reset password, deactivate |
+| **Settings** | Company & GST (GSTIN, LUT ARN, SAC, bank details, invoice prefix), SMTP email, reminder schedule, exchange rates, AI provider + key (encrypted; used from Phase 2) |
+
+### Roles
+
+| | Admin | Project Manager | Accounts Manager |
+|---|---|---|---|
+| Proposals | edit | edit | view |
+| Projects & deliverables | edit | edit | view |
+| Money figures, invoices, payments | ✅ | — | ✅ |
+| Users & settings | ✅ | — | — |
+
+## Run on your Mac
+
+Needs Node 20+ and PostgreSQL (already installed).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env          # first time only — fill in values
+npm run db:migrate            # create tables
+npm run db:seed               # first admin + Filoi company details
+npm run dev                   # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run db:demo` adds sample WHO/UNICEF/Gavi data to explore.
+`npm run db:reset` wipes everything (demo included) and re-creates the admin — do this before going live.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy on Hostinger (VPS)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a KVM VPS (Ubuntu 24.04, 2 GB+ RAM) and install Docker.
+2. Copy this folder to the server (git or `scp`).
+3. `cp .env.example .env` and set `POSTGRES_PASSWORD`, `SESSION_SECRET`, `ENCRYPTION_KEY`,
+   `ADMIN_PASSWORD`, `APP_URL=https://ops.filoi.in`, `COOKIE_SECURE=1`.
+4. `docker compose up -d --build`
+5. `docker compose exec app node node_modules/tsx/dist/cli.mjs prisma/seed.ts`
+6. Point a subdomain (e.g. `ops.filoi.in`) to the VPS and put Caddy in front for HTTPS:
+   `ops.filoi.in { reverse_proxy 127.0.0.1:3000 }`
 
-## Learn More
+Back up the `pgdata` and `uploads` Docker volumes (e.g. nightly `pg_dump` + rsync).
 
-To learn more about Next.js, take a look at the following resources:
+## Roadmap
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Phase 2 – Smart intake:** upload a TOR/RFP or contract → AI extracts dates, deliverables,
+  payment schedule into a review screen (Claude / OpenAI / Gemini / local Ollama).
+- **Phase 3 – Proposal engine:** template library from `templates-bank/`, CV bank,
+  financial proposal builder, Word/PDF export, AI drafting.
+- **Phase 4:** EMD / bank-guarantee tracker, cash-flow forecast, Tally export, 2FA, backups UI.

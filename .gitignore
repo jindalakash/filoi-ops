@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# filoi-ops
+.pgdata/
+storage/
+.env
+templates-bank/**/*
+!templates-bank/README.md
+!templates-bank/*/
+!templates-bank/*/.gitkeep
+
+!.env.example
