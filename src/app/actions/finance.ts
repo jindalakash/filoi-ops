@@ -9,7 +9,8 @@ import { computeTax } from "@/lib/tax";
 import { logActivity } from "@/lib/activity";
 import { money, num } from "@/lib/format";
 import type { ActionState } from "@/components/client";
-import type { InvoiceStatus, SupplyType } from "@prisma/client";
+import type { InvoiceStatus, SupplyType, CashKind } from "@prisma/client";
+import { saveSetting } from "@/lib/settings";
 
 // ── Billing milestones ──
 export async function saveMilestone(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -167,5 +168,43 @@ export async function deletePayment(_: ActionState, fd: FormData): Promise<Actio
     await refreshInvoiceStatus(p.invoiceId);
     revalidatePath(`/finance/invoices/${p.invoiceId}`);
     return { ok: "Payment removed." };
+  });
+}
+
+// ── Cash-flow forecast inputs ──
+export async function saveCashflowSettings(_: ActionState, fd: FormData): Promise<ActionState> {
+  await requireUser("finance");
+  return guard(async () => {
+    let monthlyCosts: { label: string; amount: number }[] = [];
+    try { monthlyCosts = JSON.parse(String(fd.get("monthlyCosts") || "[]")); } catch { throw new FormError("Could not read the monthly costs."); }
+    monthlyCosts = monthlyCosts.filter((c) => c.label?.trim() && Number(c.amount) > 0).map((c) => ({ label: c.label.trim(), amount: Number(c.amount) }));
+    await saveSetting("cashflow", {
+      openingBalance: numOf(fd, "openingBalance") ?? 0,
+      openingDate: str(fd, "openingDate") ?? "",
+      paymentDelayDays: Math.max(0, Math.round(numOf(fd, "paymentDelayDays") ?? 30)),
+      monthlyCosts,
+    });
+    revalidatePath("/finance/cashflow");
+    return { ok: "Forecast inputs saved." };
+  });
+}
+
+export async function addCashEntry(_: ActionState, fd: FormData): Promise<ActionState> {
+  await requireUser("finance");
+  return guard(async () => {
+    const amount = numOf(fd, "amountInr");
+    if (!amount || amount <= 0) throw new FormError("Enter an amount in ₹.");
+    await db.cashEntry.create({ data: { date: dateOf(fd, "date") ?? new Date(), description: req(fd, "description", "Description"), amountInr: amount, kind: (str(fd, "kind") || "OUT") as CashKind } });
+    revalidatePath("/finance/cashflow");
+    return { ok: "Added." };
+  });
+}
+
+export async function deleteCashEntry(_: ActionState, fd: FormData): Promise<ActionState> {
+  await requireUser("finance");
+  return guard(async () => {
+    await db.cashEntry.delete({ where: { id: req(fd, "id") } });
+    revalidatePath("/finance/cashflow");
+    return { ok: "Removed." };
   });
 }

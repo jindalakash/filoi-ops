@@ -575,3 +575,20 @@ model FinancialLine {
   quantity      Decimal      @db.Decimal(12, 2)
   rate          Decimal      @db.Decimal(14, 2)
 }
+
+// ───────────────────────── Cash-flow forecast ─────────────────────────
+
+enum CashKind {
+  IN
+  OUT
+}
+
+/// One-off planned cash movements for the forecast (e.g. advance tax, equipment, a grant)
+model CashEntry {
+  id          String   @id @default(cuid())
+  date        DateTime
+  description String
+  amountInr   Decimal  @db.Decimal(16, 2)
+  kind        CashKind @default(OUT)
+  createdAt   DateTime @default(now())
+}

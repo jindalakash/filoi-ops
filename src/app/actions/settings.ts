@@ -127,3 +127,26 @@ export async function loadAiModels(provider: string, typedKey: string, baseUrl: 
     return { error: /401|authentication|invalid x-api-key/i.test(m) ? "The provider rejected this API key." : m.slice(0, 200) };
   }
 }
+
+// ── Backups ──
+export async function backupNow(): Promise<ActionState> {
+  await requireUser("admin");
+  return guard(async () => {
+    const { runBackup } = await import("@/lib/backup");
+    const r = await runBackup("manual");
+    revalidatePath("/settings");
+    return { ok: `Backup created: ${r.name} (${Math.max(1, Math.round(r.size / 1024))} KB).` };
+  });
+}
+
+export async function saveBackupSettings(_: ActionState, fd: FormData): Promise<ActionState> {
+  await requireUser("admin");
+  return guard(async () => {
+    await saveSetting("backup", {
+      enabled: fd.get("enabled") === "on", hour: Math.min(23, Math.max(0, numOf(fd, "hour") ?? 2)),
+      keepDaily: Math.max(1, numOf(fd, "keepDaily") ?? 14), keepWeekly: Math.max(0, numOf(fd, "keepWeekly") ?? 8), copyDir: s(fd, "copyDir"),
+    });
+    revalidatePath("/settings");
+    return { ok: "Backup settings saved." };
+  });
+}

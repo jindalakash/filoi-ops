@@ -16,5 +16,17 @@ if (!g.__filoiCron && process.env.DISABLE_CRON !== "1") {
       console.error("[reminders] failed", e);
     }
   });
-  console.log("[filoi] reminder scheduler started");
+  // Daily backup at the configured hour
+  cron.schedule("15 * * * *", async () => {
+    try {
+      const { getSetting } = await import("./lib/settings");
+      const cfg = await getSetting("backup");
+      if (!cfg.enabled || new Date().getHours() !== Number(cfg.hour ?? 2)) return;
+      const { runBackup } = await import("./lib/backup");
+      await runBackup("scheduled");
+    } catch (e) {
+      console.error("[backup] scheduled run failed", e);
+    }
+  });
+  console.log("[filoi] reminder & backup scheduler started");
 }

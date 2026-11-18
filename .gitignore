@@ -50,3 +50,6 @@ templates-bank/**/*
 !templates-bank/*/.gitkeep
 
 !.env.example
+
+# backups (database + uploads)
+backups/

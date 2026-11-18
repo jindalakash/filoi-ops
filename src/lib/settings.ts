@@ -49,6 +49,26 @@ export type AiSettings = {
   baseUrl: string;
 };
 
+export type BackupSettings = {
+  enabled: boolean;
+  hour: number; // 24h, server time
+  keepDaily: number;
+  keepWeekly: number;
+  copyDir: string; // optional second folder (e.g. a Google Drive / external disk folder)
+  lastRunAt: string;
+  lastStatus: string; // OK | FAILED
+  lastError: string;
+  lastFile: string;
+  lastSize: number;
+};
+
+export type CashflowSettings = {
+  openingBalance: number; // INR, bank balance on openingDate
+  openingDate: string; // YYYY-MM-DD
+  paymentDelayDays: number; // default days from invoice to payment
+  monthlyCosts: { label: string; amount: number }[]; // INR per month
+};
+
 const DEFAULTS = {
   company: {
     name: "Filoi",
@@ -74,6 +94,8 @@ const DEFAULTS = {
   reminders: { enabled: true, defaultDays: "5,2,0", overdueDays: "1,7,14", hour: 8, digestEmails: "" } as ReminderSettings,
   fx: { USD: 84, EUR: 91, INR: 1 } as FxSettings,
   ai: { enabled: false, provider: "anthropic", model: "claude-opus-5-5", apiKeyEnc: "", baseUrl: "" } as AiSettings,
+  backup: { enabled: true, hour: 2, keepDaily: 14, keepWeekly: 8, copyDir: "", lastRunAt: "", lastStatus: "", lastError: "", lastFile: "", lastSize: 0 } as BackupSettings,
+  cashflow: { openingBalance: 0, openingDate: "", paymentDelayDays: 30, monthlyCosts: [] } as CashflowSettings,
 };
 
 type Defaults = typeof DEFAULTS;

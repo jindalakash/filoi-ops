@@ -5,7 +5,9 @@ import { decrypt, mask } from "@/lib/crypto";
 import { PageHeader, Card, Field, Tabs, Notice } from "@/components/ui";
 import { Badge } from "@/components/badges";
 import { ActionForm, SubmitButton } from "@/components/client";
-import { saveCompany, saveFx, saveSmtp, sendTestEmail, saveReminders, runRemindersNow, testAi } from "@/app/actions/settings";
+import { saveCompany, saveFx, saveSmtp, sendTestEmail, saveReminders, runRemindersNow, testAi, backupNow, saveBackupSettings } from "@/app/actions/settings";
+import { listBackups, BACKUP_DIR } from "@/lib/backup";
+import { Download } from "lucide-react";
 import { AiSettingsForm } from "@/components/AiSettingsForm";
 
 export const metadata = { title: "Settings" };
@@ -13,9 +15,10 @@ export const metadata = { title: "Settings" };
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const user = await requireUser("admin");
   const { tab = "company" } = await searchParams;
-  const [company, smtp, rem, fx, ai] = await Promise.all([getSetting("company"), getSetting("smtp"), getSetting("reminders"), getSetting("fx"), getSetting("ai")]);
+  const [company, smtp, rem, fx, ai, bk] = await Promise.all([getSetting("company"), getSetting("smtp"), getSetting("reminders"), getSetting("fx"), getSetting("ai"), getSetting("backup")]);
+  const backups = tab === "backups" ? await listBackups() : [];
   const logs = tab === "reminders" ? await db.notificationLog.findMany({ orderBy: { createdAt: "desc" }, take: 25 }) : [];
-  const tabs = [["company", "Company & GST"], ["email", "Email"], ["reminders", "Reminders"], ["currency", "Currencies"], ["ai", "AI (beta)"]].map(([key, label]) => ({ key, label, href: `?tab=${key}` }));
+  const tabs = [["company", "Company & GST"], ["email", "Email"], ["reminders", "Reminders"], ["currency", "Currencies"], ["ai", "AI (beta)"], ["backups", "Backups"]].map(([key, label]) => ({ key, label, href: `?tab=${key}` }));
 
   return (
     <>
@@ -123,6 +126,60 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <div className="col-span-2"><SubmitButton>Save rates</SubmitButton></div>
           </ActionForm>
         </Card>
+      )}
+
+      {tab === "backups" && (
+        <div className="grid max-w-6xl gap-6 lg:grid-cols-3">
+          <div className="space-y-6">
+            <Card title="Status">
+              {bk.lastRunAt ? (
+                <div className="space-y-1 text-sm">
+                  <div><Badge tone={bk.lastStatus === "OK" ? "green" : "red"}>{bk.lastStatus === "OK" ? "Last backup OK" : "Last backup failed"}</Badge></div>
+                  <div className="text-ink-soft">{new Date(bk.lastRunAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                  {bk.lastStatus === "OK" && <div className="text-ink-soft">{bk.lastFile} · {Math.max(1, Math.round(bk.lastSize / 1024))} KB</div>}
+                  {bk.lastError && <div className="text-red-700">{bk.lastError}</div>}
+                </div>
+              ) : <p className="text-sm text-ink-soft">No backup has run yet.</p>}
+              <ActionForm action={backupNow} className="mt-4"><SubmitButton className="btn-primary w-full" pendingText="Backing up…">Back up now</SubmitButton></ActionForm>
+            </Card>
+            <Card title="Schedule">
+              <ActionForm action={saveBackupSettings} className="space-y-4">
+                <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" name="enabled" defaultChecked={bk.enabled} className="h-4 w-4 accent-plum" /> Daily automatic backup</label>
+                <Field label="Run at hour (0–23, server time)"><input name="hour" type="number" min={0} max={23} defaultValue={bk.hour} className="input" /></Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Keep daily"><input name="keepDaily" type="number" min={1} defaultValue={bk.keepDaily} className="input" /></Field>
+                  <Field label="Keep weekly"><input name="keepWeekly" type="number" min={0} defaultValue={bk.keepWeekly} className="input" /></Field>
+                </div>
+                <Field label="Also copy to folder (off-site)" hint="e.g. your Google Drive folder, an external disk, or a mounted cloud bucket. Leave empty to keep backups only on this server."><input name="copyDir" defaultValue={bk.copyDir} className="input" placeholder="/Users/you/Google Drive/Filoi backups" /></Field>
+                <SubmitButton>Save</SubmitButton>
+              </ActionForm>
+            </Card>
+          </div>
+          <div className="space-y-6 lg:col-span-2">
+            <Card title={`Backups (${backups.length})`} pad={false}>
+              {backups.length === 0 ? <p className="p-5 text-sm text-ink-soft">None yet. Click “Back up now”.</p> : (
+                <ul className="divide-y divide-line">
+                  {backups.map((b) => (
+                    <li key={b.name} className="flex items-center gap-3 px-5 py-3 text-sm">
+                      <div className="min-w-0 flex-1"><div className="truncate font-semibold">{b.name}</div><div className="text-xs text-ink-soft">{b.createdAt.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} · {Math.max(1, Math.round(b.size / 1024))} KB</div></div>
+                      <a href={`/api/backups/${b.name}`} className="btn-ghost btn-sm"><Download size={14} /> Download</a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+            <Card title="What is backed up & how to restore">
+              <div className="space-y-3 text-sm">
+                <p>Each file contains the full <b>database</b> (proposals, projects, invoices, payments, users, settings) and all <b>uploaded documents</b>. Backups are stored in <code className="rounded bg-mist px-1">{BACKUP_DIR}</code>. Keep a copy somewhere else (the off-site folder above) — a backup on the same machine does not survive a disk failure.</p>
+                <p className="font-semibold">To restore (on the server):</p>
+                <pre className="overflow-x-auto rounded-lg bg-mist p-3 text-xs leading-relaxed">{`tar -xzf filoi-backup-YYYYMMDD-HHMMSS.tar.gz -C restore/
+pg_restore --clean --if-exists --no-owner -d "$DATABASE_URL_WITHOUT_PARAMS" restore/database.dump
+cp -R restore/uploads/* storage/uploads/`}</pre>
+                <p className="text-ink-soft">Restore replaces the current data with the backup. Test it on a copy first if you can.</p>
+              </div>
+            </Card>
+          </div>
+        </div>
       )}
 
       {tab === "ai" && (

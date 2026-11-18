@@ -10,6 +10,7 @@ import { setInvoiceStatus, deleteInvoice, recordPayment, deletePayment } from "@
 import { SUPPLY_LABEL } from "@/lib/tax";
 import { Amt } from "@/components/Money";
 import { money, date, num, inputDate } from "@/lib/format";
+import { FileDown } from "lucide-react";
 
 export default async function InvoicePage({ params }: PageProps<"/finance/invoices/[id]">) {
   const user = await requireUser("financeView");
@@ -29,7 +30,8 @@ export default async function InvoicePage({ params }: PageProps<"/finance/invoic
         title={<span className="flex flex-wrap items-center gap-3">Invoice {inv.number} <StatusBadge map={INV_STATUS} value={inv.status} /></span>}
         subtitle={<><Link className="link" href={`/projects/${inv.projectId}?tab=billing`}>{inv.project.code}</Link> · {inv.client.name}</>}
         actions={<>
-          <Link href={`/print/invoices/${id}`} className="btn-dark">View / Print PDF</Link>
+          <a href={`/api/invoices/${id}/pdf`} className="btn-dark"><FileDown size={16} /> Download PDF</a>
+          <Link href={`/print/invoices/${id}`} className="btn-ghost">Preview</Link>
           {edit && inv.status === "DRAFT" && <ConfirmAction action={setInvoiceStatus} fields={{ id, status: "SENT" }} label="Mark as sent" confirm="Mark this invoice as sent to the client?" className="btn-primary" />}
           {edit && inv.status === "DRAFT" && <ConfirmAction action={deleteInvoice} fields={{ id }} label="Delete draft" confirm="Delete this draft invoice?" className="btn-danger" />}
           {edit && ["SENT", "PARTIALLY_PAID"].includes(inv.status) && settled === 0 && <ConfirmAction action={setInvoiceStatus} fields={{ id, status: "CANCELLED" }} label="Cancel invoice" confirm="Cancel this invoice? The number stays used (GST)." className="btn-danger" />}

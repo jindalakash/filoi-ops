@@ -38,6 +38,15 @@ payments (with TDS) and sends email reminders before anything is due.
 
 Who can edit: admins and project managers; anyone with a task on the proposal; Accounts can also edit the financial proposal.
 
+## Phase 4 — Cash flow, search, backups, PDF
+
+| Feature | Where |
+|---|---|
+| **Cash-flow forecast** | Finance → *Cash-flow forecast*: 6/12-month view in ₹ of unpaid invoices (by due date), billing milestones (planned date + each client's real average payment time), optional weighted pipeline, fixed monthly costs and one-off items; projected bank balance with shortfall warnings |
+| **Global search** | Search box top-right, or **⌘K / Ctrl K** (or `/`): proposals, projects, deliverables, invoices, tasks, clients, experts, experience and file names — respecting each role's access |
+| **Backups** | Settings → *Backups*: daily automatic backup (database via `pg_dump` + uploaded files) into `backups/`, keeps 14 daily + 8 weekly, optional copy to a second folder (e.g. Google Drive), *Back up now*, download, restore steps |
+| **Invoice PDF** | *Download PDF* on every invoice — consistent A4 PDF (`FIL-26-27-002 WHO.pdf`); a copy is kept in the project's files |
+
 ## Proposal team workflow
 
 | Step | What happens |
@@ -88,4 +97,3 @@ Back up the `pgdata` and `uploads` Docker volumes (e.g. nightly `pg_dump` + rsyn
 
 ## Roadmap
 
-- **Phase 4:** EMD / bank-guarantee tracker, cash-flow forecast, Tally export, 2FA, backups UI.

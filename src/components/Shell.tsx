@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import clsx from "clsx";
 import { ThemeControls } from "./ThemeControls";
+import { CommandSearch } from "./CommandSearch";
 import { LayoutDashboard, ClipboardCheck, BookOpen, FileText, FolderKanban, ListChecks, Receipt, Building2, Users, Settings, LogOut, Menu, X } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ElementType; cap?: string };
@@ -70,7 +71,7 @@ export function Shell({ user, caps, logout, taskCount = 0, children }: { user: {
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface/90 px-4 py-3 backdrop-blur lg:hidden no-print">
         <button onClick={() => setOpen(true)} className="rounded-md p-1.5 hover:bg-mist" aria-label="Open menu"><Menu size={22} /></button>
         <div className="font-display font-semibold">Filoi Ops</div>
-        <ThemeControls />
+        <div className="flex items-center gap-2"><CommandSearch compact /><ThemeControls /></div>
       </header>
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -81,7 +82,8 @@ export function Shell({ user, caps, logout, taskCount = 0, children }: { user: {
           </aside>
         </div>
       )}
-      <div className="sticky top-0 z-20 hidden justify-end border-b border-transparent bg-mist/80 px-8 py-2.5 backdrop-blur lg:flex no-print">
+      <div className="sticky top-0 z-20 hidden items-center justify-end gap-2 border-b border-transparent bg-mist/80 px-8 py-2.5 backdrop-blur lg:flex no-print">
+        <CommandSearch />
         <ThemeControls />
       </div>
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:pb-8 lg:pt-2">{children}</main>

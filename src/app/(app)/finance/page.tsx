@@ -32,7 +32,10 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Finance" subtitle={`Billing, receivables and payments. Mixed currencies are shown in ₹ at USD ${fx.USD} / EUR ${fx.EUR} (change in Settings).`}
-        actions={can(user.role, "finance") && <Link href="/finance/invoices/new" className="btn-primary">+ New invoice</Link>} />
+        actions={<>
+          <Link href="/finance/cashflow" className="btn-ghost">Cash-flow forecast</Link>
+          {can(user.role, "finance") && <Link href="/finance/invoices/new" className="btn-primary">+ New invoice</Link>}
+        </>} />
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Invoiced (all time)" value={S(snap.invoiced)} hint={<Breakdown totals={snap.invoiced} />} tone="sky" />
         <Stat label="Received" value={S(snap.received)} hint={<Breakdown totals={snap.received} />} tone="green" />

@@ -24,6 +24,7 @@ services:
       - "127.0.0.1:3000:3000"   # put Caddy/Nginx in front for HTTPS
     volumes:
       - uploads:/app/storage/uploads
+      - ./backups:/app/backups   # on the host, so you can copy them off the server
 volumes:
   pgdata:
   uploads:
