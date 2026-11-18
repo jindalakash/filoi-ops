@@ -10,6 +10,14 @@ export const DEFAULT_MODEL: Record<string, string> = {
   ollama: "gpt-oss:20b",
 };
 
+/** Recommended cheaper model for CVs and contracts, per provider ("" = same as main). */
+export const DEFAULT_LIGHT_MODEL: Record<string, string> = {
+  anthropic: "claude-sonnet-5-5",
+  openai: "gpt-5-mini",
+  gemini: "gemini-2.5-flash",
+  ollama: "",
+};
+
 /** Built-in choices shown before (or without) loading the live list. */
 export const KNOWN_MODELS: Record<string, ModelOption[]> = {
   anthropic: [

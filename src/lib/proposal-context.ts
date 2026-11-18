@@ -36,15 +36,17 @@ export async function proposalContext(opportunityId: string, sectionId?: string)
     .map(({ l }) => `--- Past proposal: ${l.title} ---\n${cap(l.textContent, 25_000)}`)
     .join("\n\n");
 
-  const blocks = [
+  // Stable part first (same bytes for every section → prompt-cacheable); other sections change as you write, so they go separately.
+  const stableBlocks = [
     `=== OUR COMPANY ===\n${company.legalName} (${company.website}), ${company.address.replace(/\n/g, ", ")}.\n${profile || "(No company profile in the library yet.)"}`,
     `=== THE TENDER ===\nTitle: ${o.title}\nClient: ${o.client.name}\nReference: ${o.referenceNo ?? "—"}\nSubmission deadline: ${date(o.submissionDeadline)}\nDuration: ${o.durationMonths ?? "?"} months\nEvaluation: ${o.evaluationMethod ?? "—"} ${o.technicalWeight ? `(technical ${o.technicalWeight} / financial ${o.financialWeight})` : ""}\nScope summary:\n${o.scopeSummary ?? "—"}\nEligibility:\n${o.eligibility ?? "—"}\n${tor ? `\nFull TOR / RFP text:\n${cap(tor, 150_000)}` : "(TOR document not uploaded — rely on the summary.)"}`,
     team.length ? `=== PROPOSED TEAM ===\n${team.map((t) => `- ${t.position}${t.isKey ? " (key expert)" : ""}: ${t.expert.name}, ${t.expert.title ?? ""}, ${t.expert.yearsExperience ?? "?"} yrs. ${t.inputDays ? `Planned input on this assignment: ${t.inputDays} days. ` : ""}${cap(t.expert.summary, 800)}`).join("\n")}` : "=== PROPOSED TEAM ===\n(Not selected yet.)",
     refs.length ? `=== RELEVANT EXPERIENCE (use only these) ===\n${refs.map(({ reference: r }) => `- ${r.title} — ${r.client}${r.country ? `, ${r.country}` : ""} (${r.startDate?.getFullYear() ?? "?"}–${r.endDate?.getFullYear() ?? "ongoing"}). ${cap(r.description, 600)}`).join("\n")}` : "=== RELEVANT EXPERIENCE ===\n(None selected.)",
     examples ? `=== STYLE EXAMPLES: our past proposals (match tone and structure; do NOT copy client-specific facts) ===\n${examples}` : "",
-    sections.length ? `=== OTHER SECTIONS OF THIS PROPOSAL (for consistency) ===\n${sections.filter((s) => s.id !== sectionId).map((s) => `## ${s.title}\n${cap(s.content, 700) || "(not written yet)"}`).join("\n\n")}` : "",
   ].filter(Boolean);
-  return { context: blocks.join("\n\n"), opportunity: o };
+  const others = sections.filter((s) => s.id !== sectionId);
+  const volatile = others.length ? `=== OTHER SECTIONS OF THIS PROPOSAL (for consistency) ===\n${others.map((s) => `## ${s.title}\n${cap(s.content, 700) || "(not written yet)"}`).join("\n\n")}` : "";
+  return { stable: stableBlocks.join("\n\n"), volatile, opportunity: o };
 }
 
 export const DRAFT_SYSTEM = `You are a senior proposal writer at Filoi Private Limited, an Indian consulting firm in public health, digital health (DHIS2) and data systems that bids for UN agencies, development banks and governments.

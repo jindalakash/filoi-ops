@@ -44,7 +44,8 @@ export type FxSettings = { USD: number; EUR: number; INR: number }; // value of 
 export type AiSettings = {
   enabled: boolean;
   provider: "anthropic" | "openai" | "gemini" | "ollama";
-  model: string;
+  model: string; // main model: TOR / RFP reading and proposal drafting
+  lightModel: string; // cheaper model for CVs and contracts ("" = use the main model)
   apiKeyEnc: string;
   baseUrl: string;
 };
@@ -93,7 +94,7 @@ const DEFAULTS = {
   smtp: { host: "", port: 587, secure: false, user: "", passwordEnc: "", fromName: "Filoi Ops", fromEmail: "" } as SmtpSettings,
   reminders: { enabled: true, defaultDays: "5,2,0", overdueDays: "1,7,14", hour: 8, digestEmails: "" } as ReminderSettings,
   fx: { USD: 84, EUR: 91, INR: 1 } as FxSettings,
-  ai: { enabled: false, provider: "anthropic", model: "claude-opus-5-5", apiKeyEnc: "", baseUrl: "" } as AiSettings,
+  ai: { enabled: false, provider: "anthropic", model: "claude-opus-5-5", lightModel: "claude-sonnet-5-5", apiKeyEnc: "", baseUrl: "" } as AiSettings,
   backup: { enabled: true, hour: 2, keepDaily: 14, keepWeekly: 8, copyDir: "", lastRunAt: "", lastStatus: "", lastError: "", lastFile: "", lastSize: 0 } as BackupSettings,
   cashflow: { openingBalance: 0, openingDate: "", paymentDelayDays: 30, monthlyCosts: [] } as CashflowSettings,
 };

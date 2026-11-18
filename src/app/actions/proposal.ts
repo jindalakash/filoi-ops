@@ -86,20 +86,22 @@ export async function draftSection(_: ActionState, fd: FormData): Promise<Action
     const s = await db.proposalSection.findUniqueOrThrow({ where: { id: req(fd, "id") } });
     const user = await gate(s.opportunityId);
     const extra = str(fd, "instructions");
-    const { context } = await proposalContext(s.opportunityId, s.id);
+    const { stable, volatile } = await proposalContext(s.opportunityId, s.id);
     const request = [
+      volatile,
       `Write the proposal section titled "${s.title}".`,
       s.guidance && `It should cover: ${s.guidance}`,
       s.content.trim() && `Improve and complete this existing draft rather than starting over:\n"""\n${s.content.slice(0, 20_000)}\n"""`,
       extra && `Additional instructions from the bid team: ${extra}`,
       "Aim for 400–900 words unless the instructions say otherwise.",
     ].filter(Boolean).join("\n\n");
-    const r = await draftText(DRAFT_SYSTEM, context, request);
+    const r = await draftText(DRAFT_SYSTEM, stable, request);
     if (!r.text) return { error: "The AI returned an empty draft. Try again." };
     await db.proposalSection.update({ where: { id: s.id }, data: { content: r.text, aiModel: r.model, updatedById: user.id } });
-    await logActivity(user.id, "ai", "opportunity", s.opportunityId, `AI drafted “${s.title}” (${r.model})`);
+    const cache = r.cacheRead ? ` · ${Math.round(r.cacheRead / 1000)}k tokens from cache` : r.cacheWrite ? ` · cached ${Math.round(r.cacheWrite / 1000)}k tokens for the next sections` : "";
+    await logActivity(user.id, "ai", "opportunity", s.opportunityId, `AI drafted “${s.title}” (${r.model}${cache})`);
     ws(s.opportunityId);
-    return { ok: `Drafted with ${r.model}. Review and edit before using.` };
+    return { ok: `Drafted with ${r.model}${r.cacheRead ? " (reused cached context — cheaper)" : ""}. Review and edit before using.` };
   } catch (e) {
     if (e instanceof AiError || e instanceof FormError) return { error: e.message };
     console.error("[ai] draft", e);

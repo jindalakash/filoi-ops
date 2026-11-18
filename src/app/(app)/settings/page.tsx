@@ -186,7 +186,7 @@ cp -R restore/uploads/* storage/uploads/`}</pre>
         <div className="grid max-w-5xl gap-6 lg:grid-cols-3">
           <Card title="AI provider" className="lg:col-span-2">
             <div className="mb-4"><Notice>AI is optional. When enabled, it reads uploaded TORs / RFPs and contracts and pre-fills proposals, deliverables and payment schedules for you to review. Documents are sent only to the provider you choose; keys are stored encrypted in your own database. Claude and Gemini also read scanned PDFs; OpenAI and Ollama need PDFs with a text layer.</Notice></div>
-            <AiSettingsForm enabled={ai.enabled} provider={ai.provider} model={ai.model} baseUrl={ai.baseUrl} keyHint={ai.apiKeyEnc ? mask(decrypt(ai.apiKeyEnc)) : ""} />
+            <AiSettingsForm enabled={ai.enabled} provider={ai.provider} model={ai.model} lightModel={ai.lightModel ?? ""} baseUrl={ai.baseUrl} keyHint={ai.apiKeyEnc ? mask(decrypt(ai.apiKeyEnc)) : ""} />
           </Card>
           <Card title="Connection test">
             <p className="mb-3 text-sm text-ink-soft">Checks the saved key against the provider (no document is sent).</p>

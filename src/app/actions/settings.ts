@@ -31,7 +31,7 @@ export async function saveFx(_: ActionState, fd: FormData): Promise<ActionState>
   await requireUser("admin");
   return guard(async () => {
     await saveSetting("fx", { USD: numOf(fd, "USD") ?? 84, EUR: numOf(fd, "EUR") ?? 91, INR: 1 });
-    revalidatePath("/");
+    revalidatePath("/", "layout"); // amounts everywhere use these rates
     return { ok: "Exchange rates saved." };
   });
 }
@@ -44,6 +44,7 @@ export async function saveSmtp(_: ActionState, fd: FormData): Promise<ActionStat
       host: s(fd, "host"), port: numOf(fd, "port") ?? 587, secure: fd.get("secure") === "on", user: s(fd, "user"),
       fromName: s(fd, "fromName"), fromEmail: s(fd, "fromEmail"), ...(pw ? { passwordEnc: encrypt(pw) } : {}),
     });
+    revalidatePath("/settings");
     return { ok: "Email settings saved." };
   });
 }
@@ -64,6 +65,7 @@ export async function saveReminders(_: ActionState, fd: FormData): Promise<Actio
       enabled: fd.get("enabled") === "on", defaultDays: s(fd, "defaultDays") || "5,2,0", overdueDays: s(fd, "overdueDays"),
       hour: Math.min(23, Math.max(0, numOf(fd, "hour") ?? 8)), digestEmails: s(fd, "digestEmails"),
     });
+    revalidatePath("/settings");
     return { ok: "Reminder settings saved." };
   });
 }
@@ -85,11 +87,14 @@ export async function saveAi(_: ActionState, fd: FormData): Promise<ActionState>
     const model = s(fd, "model");
     if (!model) return { error: "Choose a model." };
     if (!modelMatchesProvider(provider, model)) return { error: `“${model}” is not a ${provider} model. Pick one from the list.` };
+    const lightModel = s(fd, "lightModel");
+    if (lightModel && !modelMatchesProvider(provider, lightModel)) return { error: `“${lightModel}” is not a ${provider} model. Pick one from the list.` };
     await saveSetting("ai", {
-      enabled: fd.get("enabled") === "on", provider: (s(fd, "provider") || "anthropic") as AiSettings["provider"], model: s(fd, "model") || s(fd, "customModel"),
+      enabled: fd.get("enabled") === "on", provider: (s(fd, "provider") || "anthropic") as AiSettings["provider"], model: s(fd, "model") || s(fd, "customModel"), lightModel,
       baseUrl: s(fd, "baseUrl"), ...(key ? { apiKeyEnc: encrypt(key) } : {}),
     });
-    return { ok: `AI settings saved — ${provider} · ${model}.` };
+    revalidatePath("/", "layout"); // AI buttons appear across the app
+    return { ok: `AI settings saved — ${fd.get("enabled") === "on" ? "AI is ON" : "AI is OFF"} · ${provider} · ${model}.` };
   });
 }
 

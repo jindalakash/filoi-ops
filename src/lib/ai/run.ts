@@ -13,8 +13,9 @@ export type RunResult<T> = { data: T; provider: string; model: string; inputToke
 const MAX_PDF_BYTES = 24 * 1024 * 1024; // Claude request limit is 32 MB (base64 adds ~33%)
 const MAX_TEXT_CHARS = 600_000; // ~150k tokens; beyond this we ask the user to split rather than silently truncate
 
-// Claude models that accept output_config.effort and server-side refusal fallbacks ("default" routing)
-const MODERN_CLAUDE = ["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-2", "claude-fable-5-1"];
+// Claude models that accept output_config.effort, and those that also support server-side refusal fallbacks ("default" routing)
+const EFFORT_CLAUDE = ["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2", "claude-fable-5-1"];
+const FALLBACK_CLAUDE = ["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-2", "claude-fable-5-1"];
 
 function instructions(kind: Kind) {
   const today = new Date().toISOString().slice(0, 10);
@@ -37,8 +38,11 @@ Task: read this tender (TOR / RFP / EOI) and capture what the bid team needs to 
 Task: read this contract / purchase order and capture the deliverables with their due dates, and the payment schedule. Link each payment to the deliverable it depends on using the deliverable's exact title. If payments are given only as percentages and the contract value is known, also fill the amount.`;
 }
 
-async function config(): Promise<AiSettings & { apiKey: string }> {
-  const ai = await getSetting("ai");
+async function config(kind?: Kind): Promise<AiSettings & { apiKey: string }> {
+  const stored = await getSetting("ai");
+  // CVs and contracts can use the cheaper "quick reading" model; TORs and drafting use the main model
+  const useLight = (kind === "CV" || kind === "CONTRACT") && !!stored.lightModel && modelMatchesProvider(stored.provider, stored.lightModel);
+  const ai = useLight ? { ...stored, model: stored.lightModel } : stored;
   if (!ai.enabled) throw new AiError("AI is switched off. An admin can enable it in Settings → AI.");
   const apiKey = decrypt(ai.apiKeyEnc);
   if (ai.provider !== "ollama" && !apiKey) throw new AiError("No API key saved. An admin can add one in Settings → AI.");
@@ -86,15 +90,14 @@ async function runClaude<T>(cfg: Awaited<ReturnType<typeof config>>, kind: Kind,
   }
   content.push({ type: "text", text: kind === "TENDER" ? "Extract the tender details." : kind === "CV" ? "Extract the CV details." : "Extract the contract details." });
 
-  const modern = MODERN_CLAUDE.includes(cfg.model);
   const stream = client.beta.messages.stream({
     model: cfg.model,
     max_tokens: 32000,
     system: instructions(kind),
     messages: [{ role: "user", content }],
-    output_config: { format: { type: "json_schema", schema: schema as Record<string, unknown> }, ...(modern ? { effort: "medium" as const } : {}) },
+    output_config: { format: { type: "json_schema", schema: schema as Record<string, unknown> }, ...(EFFORT_CLAUDE.includes(cfg.model) ? { effort: "medium" as const } : {}) },
     // If Claude's safety filter declines a document, the API retries on a suitable fallback model in the same call.
-    ...(modern ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+    ...(FALLBACK_CLAUDE.includes(cfg.model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
   });
   let msg: Anthropic.Beta.BetaMessage;
   try {
@@ -163,7 +166,7 @@ async function runOllama<T>(cfg: Awaited<ReturnType<typeof config>>, kind: Kind,
 
 async function run<T>(kind: Kind, docs: SourceDoc[], schema: object): Promise<RunResult<T>> {
   if (!docs.length) throw new AiError("No documents to read.");
-  const cfg = await config();
+  const cfg = await config(kind);
   switch (cfg.provider) {
     case "anthropic": return runClaude<T>(cfg, kind, docs, schema);
     case "openai": return runOpenAI<T>(cfg, kind, docs, schema);
@@ -178,30 +181,40 @@ export const extractContract = (docs: SourceDoc[]) => run<ContractExtraction>("C
 export const extractCv = (docs: SourceDoc[]) => run<CvExtraction>("CV", docs, CV_SCHEMA);
 
 // ── Free-text drafting (proposal sections) ──
-export type DraftResult = { text: string; provider: string; model: string };
+export type DraftResult = { text: string; provider: string; model: string; cacheRead?: number; cacheWrite?: number; inputTokens?: number };
 
-/** Generate prose from a system prompt and a context bundle. Text only, so it works with every provider. */
-export async function draftText(system: string, context: string, request: string): Promise<DraftResult> {
+/**
+ * Generate prose from a system prompt, a stable context bundle and a per-request part.
+ * With Claude the stable part is prompt-cached for 1 hour, so drafting the next sections of the same proposal re-reads it at ~5% of the price.
+ */
+export async function draftText(system: string, stable: string, request: string): Promise<DraftResult> {
   const cfg = await config();
-  const user = `${context}\n\n=== YOUR TASK ===\n${request}`;
+  const user = `${stable}\n\n=== YOUR TASK ===\n${request}`;
   if (user.length > MAX_TEXT_CHARS) throw new AiError("Too much context for one request. Remove some library documents or shorten the TOR.");
   if (cfg.provider === "anthropic") {
     const client = new Anthropic({ apiKey: cfg.apiKey, ...(cfg.baseUrl ? { baseURL: cfg.baseUrl } : {}) });
-    const modern = MODERN_CLAUDE.includes(cfg.model);
     try {
       const msg = await client.beta.messages
         .stream({
           model: cfg.model,
           max_tokens: 16000,
-          system,
-          messages: [{ role: "user", content: user }],
-          ...(modern ? { output_config: { effort: "medium" as const }, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+          system: [{ type: "text", text: system }],
+          messages: [{
+            role: "user",
+            content: [
+              // breakpoint after the stable context: system + this block form the cached prefix
+              { type: "text", text: stable, cache_control: { type: "ephemeral", ttl: "1h" } },
+              { type: "text", text: `=== YOUR TASK ===\n${request}` },
+            ],
+          }],
+          ...(EFFORT_CLAUDE.includes(cfg.model) ? { output_config: { effort: "medium" as const } } : {}),
+          ...(FALLBACK_CLAUDE.includes(cfg.model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
         })
         .finalMessage();
       if (msg.stop_reason === "refusal") throw new AiError("The model declined to write this section.");
       const text = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("").trim();
       if (msg.stop_reason === "max_tokens") throw new AiError("The draft was too long and got cut off. Ask for a shorter section.");
-      return { text, provider: "anthropic", model: msg.model };
+      return { text, provider: "anthropic", model: msg.model, cacheRead: msg.usage.cache_read_input_tokens ?? 0, cacheWrite: msg.usage.cache_creation_input_tokens ?? 0, inputTokens: msg.usage.input_tokens };
     } catch (e) {
       if (e instanceof AiError) throw e;
       if (e instanceof Anthropic.AuthenticationError) throw new AiError("Claude rejected the API key. Check it in Settings → AI.");
