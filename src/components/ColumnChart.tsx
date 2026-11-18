@@ -28,7 +28,7 @@ export function ColumnChart({ data, color = "var(--color-plum)", currency = "INR
                 aria-label={`${d.label}: ${format(d.value)}`}>
                 <span className="block w-full max-w-6 rounded-t transition-[filter]" style={{ height: `${h}%`, minHeight: d.value > 0 ? 2 : 0, background: color, filter: hover === i ? "brightness(1.15)" : undefined }} />
                 {hover === i && (
-                  <span className="pointer-events-none absolute z-10 w-max max-w-48 rounded-lg border border-line bg-white px-2.5 py-1.5 text-left shadow-lg" style={{ bottom: `calc(${h}% + 8px)` }}>
+                  <span className="pointer-events-none absolute z-10 w-max max-w-48 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-left shadow-lg" style={{ bottom: `calc(${h}% + 8px)` }}>
                     <span className="block font-display text-sm font-semibold tabular-nums text-ink">{format(d.value)}</span>
                     <span className="block text-[11px] text-ink-soft">{d.label}{d.detail ? ` · ${d.detail}` : ""}</span>
                   </span>

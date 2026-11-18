@@ -33,7 +33,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       <PageHeader title="Projects" subtitle="Contracts in delivery — deliverables, deadlines and billing."
         actions={can(user.role, "projects") && <Link href="/projects/new" className="btn-primary">+ New project</Link>} />
       <div className="mb-4 flex flex-wrap gap-2">
-        {tabs.map(([k, l]) => <Link key={k} href={`/projects?s=${k}`} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold", s === k ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-soft hover:text-ink")}>{l}</Link>)}
+        {tabs.map(([k, l]) => <Link key={k} href={`/projects?s=${k}`} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold", s === k ? "border-navy bg-navy text-white" : "border-line bg-surface text-ink-soft hover:text-ink")}>{l}</Link>)}
       </div>
       {projects.length === 0 ? <Card><Empty title="No projects">When a proposal is won, use “Create project” — or add one directly.</Empty></Card> : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

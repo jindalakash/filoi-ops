@@ -34,7 +34,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       <PageHeader title="My tasks" subtitle="Proposal parts assigned to you, and work waiting for your review." />
       <div className="mb-4 flex flex-wrap gap-2">
         {views.map(([k, l]) => (
-          <Link key={k} href={`/tasks?v=${k}`} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold", v === k ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-soft hover:text-ink")}>
+          <Link key={k} href={`/tasks?v=${k}`} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold", v === k ? "border-navy bg-navy text-white" : "border-line bg-surface text-ink-soft hover:text-ink")}>
             {l} <span className="ml-1 opacity-70">{counts[k]}</span>
           </Link>
         ))}

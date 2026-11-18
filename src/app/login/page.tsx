@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { login } from "../actions/auth";
 import { ActionForm, SubmitButton } from "@/components/client";
+import { ThemeControls } from "@/components/ThemeControls";
 
 export const metadata = { title: "Sign in" };
 
@@ -8,7 +9,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { next } = await searchParams;
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-ink lg:block">
+      <div className="relative hidden overflow-hidden bg-navy lg:block">
         <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-plum/40 blur-3xl" />
         <div className="absolute -bottom-32 right-0 h-[28rem] w-[28rem] rounded-full bg-sky/30 blur-3xl" />
         <div className="relative flex h-full flex-col justify-between p-12 text-white">
@@ -20,9 +21,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <div className="text-sm text-white/50">Filoi Private Limited · www.filoi.in</div>
         </div>
       </div>
-      <div className="flex items-center justify-center p-6">
+      <div className="relative flex items-center justify-center p-6">
+        <ThemeControls className="absolute right-5 top-5" />
         <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden"><Image src="/filoi-logo.png" alt="Filoi" width={80} height={50} priority /></div>
+          <div className="mb-8 inline-flex rounded-xl bg-white px-3 py-2 lg:hidden"><Image src="/filoi-logo.png" alt="Filoi" width={80} height={50} priority /></div>
           <h2 className="text-2xl font-semibold">Sign in</h2>
           <p className="mt-1 text-sm text-ink-soft">Use the account your administrator created for you.</p>
           <ActionForm action={login} className="mt-6 space-y-4">

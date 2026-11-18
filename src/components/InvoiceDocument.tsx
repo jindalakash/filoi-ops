@@ -8,8 +8,8 @@ export function InvoiceDocument({ inv, company }: { inv: Invoice & { items: Invo
   const isExport = inv.supplyType === "EXPORT_LUT";
   const rate = num(inv.taxRate);
   return (
-    <div className="mx-auto max-w-[800px] bg-white p-10 text-[13px] leading-relaxed text-ink print:p-0">
-      <div className="flex items-start justify-between gap-6 border-b-2 border-ink pb-5">
+    <div className="mx-auto max-w-[800px] bg-surface p-10 text-[13px] leading-relaxed text-ink print:p-0">
+      <div className="flex items-start justify-between gap-6 border-b-2 border-navy pb-5">
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/filoi-logo.png" alt="Filoi" className="h-14 w-auto" />
@@ -57,7 +57,7 @@ export function InvoiceDocument({ inv, company }: { inv: Invoice & { items: Invo
 
       <table className="mt-6 w-full border-collapse text-[12.5px]">
         <thead>
-          <tr className="bg-ink text-left text-white">
+          <tr className="bg-navy text-left text-white">
             <th className="px-3 py-2 font-semibold">#</th><th className="px-3 py-2 font-semibold">Description of services</th><th className="px-3 py-2 font-semibold">SAC</th>
             <th className="px-3 py-2 text-right font-semibold">Qty</th><th className="px-3 py-2 text-right font-semibold">Rate</th><th className="px-3 py-2 text-right font-semibold">Amount ({c})</th>
           </tr>
@@ -80,7 +80,7 @@ export function InvoiceDocument({ inv, company }: { inv: Invoice & { items: Invo
             {num(inv.sgst) > 0 && <tr><td className="py-1 text-ink-soft">SGST @ {rate / 2}%</td><td className="py-1 text-right">{money(inv.sgst, c)}</td></tr>}
             {num(inv.igst) > 0 && <tr><td className="py-1 text-ink-soft">IGST @ {rate}%</td><td className="py-1 text-right">{money(inv.igst, c)}</td></tr>}
             {isExport && <tr><td className="py-1 text-ink-soft">IGST @ 0% (LUT)</td><td className="py-1 text-right">{money(0, c)}</td></tr>}
-            <tr className="border-t-2 border-ink font-semibold"><td className="py-2">Total</td><td className="py-2 text-right">{money(inv.total, c)}</td></tr>
+            <tr className="border-t-2 border-navy font-semibold"><td className="py-2">Total</td><td className="py-2 text-right">{money(inv.total, c)}</td></tr>
           </tbody>
         </table>
       </div>

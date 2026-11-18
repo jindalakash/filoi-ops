@@ -19,7 +19,7 @@ export function Avatar({ name, size = "sm" }: { name?: string | null; size?: "sm
   const ini = name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className={clsx("grid shrink-0 place-items-center rounded-full bg-ink font-bold text-white", size === "sm" ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs")}>{ini}</span>
+      <span className={clsx("grid shrink-0 place-items-center rounded-full bg-navy font-bold text-white", size === "sm" ? "h-6 w-6 text-[10px]" : "h-8 w-8 text-xs")}>{ini}</span>
       <span className="truncate text-sm">{name}</span>
     </span>
   );

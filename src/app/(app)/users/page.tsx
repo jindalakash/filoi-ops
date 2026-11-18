@@ -54,7 +54,7 @@ export default async function UsersPage() {
           {users.map((u) => (
             <li key={u.id} className="px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white ${u.active ? "bg-ink" : "bg-slate-300"}`}>{u.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}</div>
+                <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white ${u.active ? "bg-navy" : "bg-slate-300"}`}>{u.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2 font-semibold">{u.name}{u.id === me.id && <span className="text-xs font-normal text-ink-soft">(you)</span>}
                     <Badge tone={u.role === "ADMIN" ? "purple" : u.role === "ACCOUNTS" ? "green" : "blue"}>{ROLE_LABEL[u.role]}</Badge>{!u.active && <Badge tone="red">Deactivated</Badge>}</div>

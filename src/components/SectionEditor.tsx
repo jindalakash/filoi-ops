@@ -9,7 +9,7 @@ export function SectionEditor({ s, index, editable, ai }: { s: ProposalSection; 
   return (
     <section id={`s-${s.id}`} className="card overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-ink text-xs font-bold text-white">{index + 1}</span>
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-navy text-xs font-bold text-white">{index + 1}</span>
         <h3 className="flex-1 font-display font-semibold">{s.title}</h3>
         {s.aiModel && <Badge tone="purple">AI draft</Badge>}
         <span className="text-xs text-ink-soft">{words} words</span>

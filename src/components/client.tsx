@@ -2,6 +2,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import clsx from "clsx";
+import { play } from "@/lib/sound";
 
 export type ActionState = { error?: string; ok?: string } | undefined;
 type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
@@ -21,9 +22,10 @@ export function ActionForm({ action, children, className, resetOnOk, onOk }: { a
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (state?.ok) {
+      play("success");
       if (resetOnOk) ref.current?.reset();
       onOk?.();
-    }
+    } else if (state?.error) play("error");
   }, [state, resetOnOk, onOk]);
   return (
     <form ref={ref} action={run} className={className}>
@@ -37,6 +39,7 @@ export function ActionForm({ action, children, className, resetOnOk, onOk }: { a
 /** A small button that submits a hidden-field form after confirm(). */
 export function ConfirmAction({ action, fields, label, confirm, className = "btn-danger btn-sm" }: { action: Action; fields: Record<string, string>; label: React.ReactNode; confirm: string; className?: string }) {
   const [state, run] = useActionState(action, undefined);
+  useEffect(() => { if (state?.error) play("error"); else if (state?.ok) play("success"); }, [state]);
   return (
     <form action={run} onSubmit={(e) => { if (!window.confirm(confirm)) e.preventDefault(); }} className="inline">
       {Object.entries(fields).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
@@ -51,7 +54,7 @@ export function Disclosure({ label, children, className = "btn-ghost btn-sm", de
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div>
-      <button type="button" className={className} onClick={() => setOpen((o) => !o)}>{open ? "Close" : label}</button>
+      <button type="button" data-silent className={className} onClick={() => { play(open ? "close" : "pop"); setOpen((o) => !o); }}>{open ? "Close" : label}</button>
       {open && <div className={panelClassName}>{children}</div>}
     </div>
   );

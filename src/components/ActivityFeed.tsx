@@ -14,7 +14,7 @@ export async function ActivityFeed({ entities }: { entities: { entity: string; i
         <ol className="relative space-y-4 border-l border-line pl-4">
           {items.map((a) => (
             <li key={a.id} className="relative">
-              <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-plum" />
+              <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-plum" />
               <div className="text-sm">{a.summary}</div>
               <div className="text-xs text-ink-soft">{a.user?.name ?? "System"} · {a.createdAt.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
             </li>

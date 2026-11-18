@@ -39,7 +39,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
         actions={can(user.role, "presales") && <Link href="/opportunities/new" className="btn-primary">+ New proposal</Link>} />
       <div className="mb-4 flex flex-wrap gap-2">
         {FILTERS.map((x) => (
-          <Link key={x.key} href={`/opportunities?f=${x.key}`} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold transition", f === x.key ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-soft hover:text-ink")}>
+          <Link key={x.key} href={`/opportunities?f=${x.key}`} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold transition", f === x.key ? "border-navy bg-navy text-white" : "border-line bg-surface text-ink-soft hover:text-ink")}>
             {x.label} <span className="ml-1 opacity-70">{countFor(x.statuses)}</span>
           </Link>
         ))}

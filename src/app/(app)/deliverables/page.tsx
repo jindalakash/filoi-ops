@@ -31,8 +31,8 @@ export default async function DeliverablesPage({ searchParams }: { searchParams:
     <>
       <PageHeader title="Deliverables" subtitle="Every output across active projects, by due date." />
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {views.map(([k, l]) => <Link key={k} href={q(k, mine)} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold", v === k ? "border-ink bg-ink text-white" : "border-line bg-white text-ink-soft hover:text-ink")}>{l}</Link>)}
-        <Link href={q(v, mine ? undefined : "1")} className={clsx("ml-auto rounded-full border px-3 py-1.5 text-sm font-semibold", mine ? "border-plum bg-plum text-white" : "border-line bg-white text-ink-soft")}>{mine ? "✓ " : ""}Only mine</Link>
+        {views.map(([k, l]) => <Link key={k} href={q(k, mine)} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold", v === k ? "border-navy bg-navy text-white" : "border-line bg-surface text-ink-soft hover:text-ink")}>{l}</Link>)}
+        <Link href={q(v, mine ? undefined : "1")} className={clsx("ml-auto rounded-full border px-3 py-1.5 text-sm font-semibold", mine ? "border-plum bg-plum text-white" : "border-line bg-surface text-ink-soft")}>{mine ? "✓ " : ""}Only mine</Link>
       </div>
       <Card pad={false}>
         {rows.length === 0 ? <Empty title="Nothing here">No deliverables match this view.</Empty> : (

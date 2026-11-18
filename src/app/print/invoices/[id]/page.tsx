@@ -14,7 +14,7 @@ export default async function PrintInvoice({ params }: PageProps<"/print/invoice
   ]);
   if (!inv) notFound();
   return (
-    <div className="min-h-dvh bg-mist py-8 print:bg-white print:py-0">
+    <div data-theme="light" className="min-h-dvh bg-mist py-8 text-ink print:bg-white print:py-0">
       <div className="no-print mx-auto mb-4 flex max-w-[800px] justify-between px-2">
         <a href={`/finance/invoices/${id}`} className="btn-ghost">← Back</a>
         <PrintButton />

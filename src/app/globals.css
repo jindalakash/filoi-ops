@@ -1,11 +1,37 @@
 @import "tailwindcss";
 
+/* Dark mode follows <html data-theme="dark"> (set before first paint by the script in layout.tsx). */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* Theme-dependent tokens. A nested data-theme="light" (e.g. printed invoices) resets them. */
+:root, [data-theme=light] {
+  --c-ink: #0f2550;
+  --c-ink-soft: #4a5878;
+  --c-mist: #f3f5fa;
+  --c-line: #dfe4ef;
+  --c-surface: #ffffff;
+  color-scheme: light;
+}
+[data-theme=dark] {
+  --c-ink: #e6ebf5;
+  --c-ink-soft: #98a4be;
+  --c-mist: #0a1222;
+  --c-line: #24314d;
+  --c-surface: #111b30;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-ink: var(--c-ink);
+  --color-ink-soft: var(--c-ink-soft);
+  --color-mist: var(--c-mist);
+  --color-line: var(--c-line);
+  --color-surface: var(--c-surface);
+}
+
 @theme {
-  --color-ink: #0f2550;
-  --color-ink-soft: #4a5878;
+  --color-navy: #0f2550; /* brand navy, same in both themes (sidebar, dark buttons) */
   --color-night: #0a1a3a;
-  --color-mist: #f3f5fa;
-  --color-line: #dfe4ef;
   --color-plum: #8a2c8d;
   --color-plum-dark: #6f2272;
   --color-sky: #2f6fc0;
@@ -15,19 +41,19 @@
 }
 
 html { -webkit-text-size-adjust: 100%; }
-body { @apply bg-mist text-ink antialiased; font-family: var(--font-sans); }
+body { @apply bg-mist text-ink antialiased; font-family: var(--font-sans); transition: background-color .25s ease, color .25s ease; }
 h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
 
 @layer components {
-  .card { @apply rounded-2xl border border-line bg-white shadow-[0_1px_2px_rgba(15,37,80,0.04)]; }
+  .card { @apply rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(15,37,80,0.04)]; }
   .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap; }
   .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap bg-plum text-white hover:bg-plum-dark; }
-  .btn-dark { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap bg-ink text-white hover:bg-night; }
-  .btn-ghost { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap border border-line bg-white text-ink hover:bg-mist; }
-  .btn-danger { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap border border-red-200 bg-white text-red-700 hover:bg-red-50; }
+  .btn-dark { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap bg-navy text-white hover:bg-night dark:bg-[#2a3d6b] dark:hover:bg-[#344a80]; }
+  .btn-ghost { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap border border-line bg-surface text-ink hover:bg-mist; }
+  .btn-danger { @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap border border-red-200 bg-surface text-red-700 hover:bg-red-50; }
   .btn-sm { @apply px-2.5 py-1.5 text-xs; }
   .label { @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-soft; }
-  .input { @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-sky focus:ring-2 focus:ring-sky/20; }
+  .input { @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-soft/50 focus:border-sky focus:ring-2 focus:ring-sky/20; }
   .table { @apply w-full text-sm; }
   .table th { @apply border-b border-line bg-mist/60 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-ink-soft whitespace-nowrap; }
   .table td { @apply border-b border-line/70 px-4 py-3 align-top; }
@@ -42,3 +68,29 @@ h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0
   .no-print { display: none !important; }
   body { background: white; }
 }
+
+/* ── Dark mode: brand accents and status tints ── */
+[data-theme=dark] .text-plum:not([data-theme=light] *) { color: #d38ad6; }
+[data-theme=dark] .text-sky:not([data-theme=light] *) { color: #79b0f5; }
+[data-theme=dark] .border-navy:not([data-theme=light] *) { border-color: #3a4f80; }
+[data-theme=dark] .bg-navy.border-navy:not([data-theme=light] *) { background-color: #2a3d6b; }
+[data-theme=dark] .bg-red-50:not([data-theme=light] *) { background-color: rgb(239 68 68 / .12); }
+[data-theme=dark] .bg-amber-50:not([data-theme=light] *) { background-color: rgb(245 158 11 / .12); }
+[data-theme=dark] .bg-emerald-50:not([data-theme=light] *), [data-theme=dark] .bg-emerald-50\/50:not([data-theme=light] *) { background-color: rgb(16 185 129 / .12); }
+[data-theme=dark] .bg-slate-100:not([data-theme=light] *) { background-color: rgb(148 163 184 / .15); }
+[data-theme=dark] .bg-slate-300:not([data-theme=light] *) { background-color: #3b4864; }
+[data-theme=dark] .text-red-700:not([data-theme=light] *), [data-theme=dark] .text-red-800:not([data-theme=light] *) { color: #fca5a5; }
+[data-theme=dark] .text-amber-700:not([data-theme=light] *), [data-theme=dark] .text-amber-800:not([data-theme=light] *), [data-theme=dark] .text-amber-900:not([data-theme=light] *) { color: #fcd34d; }
+[data-theme=dark] .text-emerald-700:not([data-theme=light] *), [data-theme=dark] .text-emerald-800:not([data-theme=light] *), [data-theme=dark] .text-emerald-900:not([data-theme=light] *) { color: #6ee7b7; }
+[data-theme=dark] .text-slate-700:not([data-theme=light] *) { color: #cbd5e1; }
+[data-theme=dark] .border-red-200:not([data-theme=light] *) { border-color: rgb(239 68 68 / .35); }
+[data-theme=dark] .border-amber-200:not([data-theme=light] *), [data-theme=dark] .border-amber-300:not([data-theme=light] *) { border-color: rgb(245 158 11 / .35); }
+[data-theme=dark] .border-emerald-200:not([data-theme=light] *) { border-color: rgb(16 185 129 / .35); }
+[data-theme=dark] .ring-red-200:not([data-theme=light] *) { --tw-ring-color: rgb(239 68 68 / .35); }
+[data-theme=dark] .ring-amber-200:not([data-theme=light] *) { --tw-ring-color: rgb(245 158 11 / .35); }
+[data-theme=dark] .ring-emerald-200:not([data-theme=light] *) { --tw-ring-color: rgb(16 185 129 / .35); }
+[data-theme=dark] .ring-slate-200:not([data-theme=light] *) { --tw-ring-color: rgb(148 163 184 / .3); }
+[data-theme=dark] .card:not([data-theme=light] *) { box-shadow: 0 1px 2px rgb(0 0 0 / .3); }
+
+/* smooth theme switch for surfaces */
+.card, .input, .btn-ghost { transition: background-color .25s ease, border-color .25s ease, color .25s ease; }

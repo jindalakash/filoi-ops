@@ -35,7 +35,7 @@ export function Card({ title, actions, children, className, pad = true }: { titl
 }
 
 export function Stat({ label, value, hint, tone = "ink", href }: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: "ink" | "plum" | "sky" | "sun" | "green" | "red"; href?: string }) {
-  const bar: Record<string, string> = { ink: "bg-ink", plum: "bg-plum", sky: "bg-sky", sun: "bg-sun", green: "bg-emerald-600", red: "bg-red-600" };
+  const bar: Record<string, string> = { ink: "bg-navy", plum: "bg-plum", sky: "bg-sky", sun: "bg-sun", green: "bg-emerald-600", red: "bg-red-600" };
   const inner = (
     <div className="card relative h-full overflow-hidden p-4 transition hover:shadow-md">
       <span className={clsx("absolute inset-y-0 left-0 w-1", bar[tone])} />
