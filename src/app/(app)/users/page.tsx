@@ -21,7 +21,8 @@ function UserFields({ u }: { u?: User }) {
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {u && <input type="hidden" name="id" value={u.id} />}
       <Field label="Full name *"><input name="name" required defaultValue={u?.name} className="input" /></Field>
-      <Field label="Email (login) *"><input name="email" type="email" required defaultValue={u?.email} className="input" /></Field>
+      <Field label="Username (login) *" hint="Short name used to sign in, e.g. neeraj"><input name="username" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{1,29}" defaultValue={u?.username} className="input lowercase" autoCapitalize="none" placeholder="neeraj" /></Field>
+      <Field label="Email *" hint="For reminders and alerts; also works for sign-in"><input name="email" type="email" required defaultValue={u?.email} className="input" /></Field>
       <Field label="Role *">
         <select name="role" defaultValue={u?.role ?? "PROJECT_MANAGER"} className="input">{ROLE_HELP.map(([r]) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select>
       </Field>
@@ -58,7 +59,7 @@ export default async function UsersPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2 font-semibold">{u.name}{u.id === me.id && <span className="text-xs font-normal text-ink-soft">(you)</span>}
                     <Badge tone={u.role === "ADMIN" ? "purple" : u.role === "ACCOUNTS" ? "green" : "blue"}>{ROLE_LABEL[u.role]}</Badge>{!u.active && <Badge tone="red">Deactivated</Badge>}</div>
-                  <div className="text-sm text-ink-soft">{u.email}{u.designation && ` · ${u.designation}`} · last login {u.lastLoginAt ? date(u.lastLoginAt) : "never"}</div>
+                  <div className="text-sm text-ink-soft"><span className="font-semibold text-ink">@{u.username}</span> · {u.email}{u.designation && ` · ${u.designation}`} · last login {u.lastLoginAt ? date(u.lastLoginAt) : "never"}</div>
                 </div>
                 {u.id !== me.id && <ConfirmAction action={toggleUser} fields={{ id: u.id }} label={u.active ? "Deactivate" : "Activate"} confirm={`${u.active ? "Deactivate" : "Activate"} ${u.name}?`} className={u.active ? "btn-danger btn-sm" : "btn-ghost btn-sm"} />}
               </div>

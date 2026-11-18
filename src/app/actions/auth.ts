@@ -7,12 +7,13 @@ import { signSession, SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/session";
 import type { ActionState } from "@/components/client";
 
 export async function login(_: ActionState, fd: FormData): Promise<ActionState> {
-  const email = String(fd.get("email") || "").trim().toLowerCase();
+  const id = String(fd.get("identifier") || fd.get("email") || "").trim().toLowerCase();
   const password = String(fd.get("password") || "");
   const next = String(fd.get("next") || "/");
-  const user = await db.user.findUnique({ where: { email } });
+  // sign in with the short username ("neeraj") or the full email
+  const user = id.includes("@") ? await db.user.findUnique({ where: { email: id } }) : await db.user.findUnique({ where: { username: id } });
   if (!user || !user.active || !(await bcrypt.compare(password, user.passwordHash))) {
-    return { error: "Incorrect email or password." };
+    return { error: "Incorrect username or password." };
   }
   const token = await signSession({ uid: user.id, role: user.role, name: user.name });
   // "Keep me signed in" → 7-day cookie; otherwise it ends when the browser closes (the token itself still expires after 7 days)

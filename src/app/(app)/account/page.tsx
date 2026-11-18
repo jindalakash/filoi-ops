@@ -12,7 +12,7 @@ export default async function AccountPage() {
     <>
       <PageHeader title="My account" />
       <div className="grid max-w-4xl gap-6 md:grid-cols-2">
-        <Card title="Profile"><KV items={[["Name", u.name], ["Email", u.email], ["Role", ROLE_LABEL[u.role]]]} /></Card>
+        <Card title="Profile"><KV items={[["Name", u.name], ["Username", `@${u.username}`], ["Email", u.email], ["Role", ROLE_LABEL[u.role]]]} /></Card>
         <Card title="Change password">
           <ActionForm action={changeOwnPassword} resetOnOk className="space-y-3">
             <Field label="Current password"><input name="current" type="password" required className="input" autoComplete="current-password" /></Field>

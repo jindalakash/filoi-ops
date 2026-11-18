@@ -1,7 +1,7 @@
 "use client";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertTriangle, Info } from "lucide-react";
+import { UserRound, Lock, Eye, EyeOff, ArrowRight, AlertTriangle, Info } from "lucide-react";
 import clsx from "clsx";
 import { login } from "@/app/actions/auth";
 import { play } from "@/lib/sound";
@@ -44,10 +44,10 @@ export function LoginForm({ next }: { next: string }) {
         <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-800"><AlertTriangle size={16} className="shrink-0" /> {state.error}</div>
       )}
       <label className="block">
-        <span className="mb-1.5 block text-sm font-semibold text-ink">Work email</span>
+        <span className="mb-1.5 block text-sm font-semibold text-ink">Username or email</span>
         <span className="relative block">
-          <input name="email" type="email" required autoComplete="email" autoFocus placeholder="you@filoi.in" value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
-          <Mail size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-soft transition peer-focus:text-plum" />
+          <input name="identifier" type="text" required autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoFocus placeholder="e.g. neeraj" value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
+          <UserRound size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-soft transition peer-focus:text-plum" />
         </span>
       </label>
       <label className="block">

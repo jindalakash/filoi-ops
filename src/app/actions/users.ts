@@ -17,10 +17,12 @@ export async function saveUser(_: ActionState, fd: FormData): Promise<ActionStat
   return guard(async () => {
     const id = str(fd, "id");
     const email = req(fd, "email", "Email").toLowerCase();
+    const username = (str(fd, "username") || email.split("@")[0]).toLowerCase();
+    if (!/^[a-z0-9][a-z0-9._-]{1,29}$/.test(username)) throw new FormError("Username: 2–30 characters, letters, numbers, dot, dash or underscore (no spaces).");
     const role = req(fd, "role") as Role;
-    const data = { name: req(fd, "name", "Name"), email, role, designation: str(fd, "designation"), phone: str(fd, "phone") };
-    const clash = await db.user.findFirst({ where: { email, ...(id ? { NOT: { id } } : {}) } });
-    if (clash) throw new FormError("Another user already has this email.");
+    const data = { name: req(fd, "name", "Name"), username, email, role, designation: str(fd, "designation"), phone: str(fd, "phone") };
+    const clash = await db.user.findFirst({ where: { OR: [{ email }, { username }], ...(id ? { NOT: { id } } : {}) } });
+    if (clash) throw new FormError(clash.email === email ? "Another user already has this email." : `The username “${username}” is taken.`);
     if (id) {
       if (id === admin.id && role !== "ADMIN") throw new FormError("You cannot remove your own admin role.");
       await db.user.update({ where: { id }, data });
@@ -33,7 +35,7 @@ export async function saveUser(_: ActionState, fd: FormData): Promise<ActionStat
     const u = await db.user.create({ data: { ...data, passwordHash: await bcrypt.hash(password, 10) } });
     await logActivity(admin.id, "create", "user", u.id, `Created user ${email} (${role})`);
     revalidatePath("/users");
-    return { ok: `User ${u.name} created. Share the password with them securely.` };
+    return { ok: `User ${u.name} created — they sign in as “${u.username}”. Share the password with them securely.` };
   });
 }
 

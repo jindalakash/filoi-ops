@@ -13,7 +13,7 @@ async function main() {
   const admin = await db.user.upsert({
     where: { email },
     update: {},
-    create: { email, name: "Filoi Admin", role: "ADMIN", designation: "Director", passwordHash: await bcrypt.hash(password, 10) },
+    create: { email, username: process.env.ADMIN_USERNAME || "admin", name: "Filoi Admin", role: "ADMIN", designation: "Director", passwordHash: await bcrypt.hash(password, 10) },
   });
   console.log(`✔ admin user: ${email}`);
 
@@ -35,8 +35,8 @@ async function main() {
   if (!demo) return;
   if (await db.client.count()) { console.log("• data exists, skipping demo"); return; }
   const pw = await bcrypt.hash(password, 10);
-  const pm = await db.user.create({ data: { email: "pm.demo@filoi.in", name: "Priya Sharma (demo)", role: "PROJECT_MANAGER", designation: "Project Manager", passwordHash: pw } });
-  await db.user.create({ data: { email: "accounts.demo@filoi.in", name: "Rahul Verma (demo)", role: "ACCOUNTS", designation: "Accounts Manager", passwordHash: pw } });
+  const pm = await db.user.create({ data: { email: "pm.demo@filoi.in", username: "pm.demo", name: "Priya Sharma (demo)", role: "PROJECT_MANAGER", designation: "Project Manager", passwordHash: pw } });
+  await db.user.create({ data: { email: "accounts.demo@filoi.in", username: "accounts.demo", name: "Rahul Verma (demo)", role: "ACCOUNTS", designation: "Accounts Manager", passwordHash: pw } });
 
   const who = await db.client.create({ data: { name: "World Health Organization", shortName: "WHO", type: "UN_AGENCY", country: "Switzerland", address: "Avenue Appia 20\n1211 Geneva 27", defaultCurrency: "USD", contactName: "Procurement Officer" } });
   const unicef = await db.client.create({ data: { name: "UNICEF Regional Office for South Asia", shortName: "UNICEF ROSA", type: "UN_AGENCY", country: "Nepal", address: "Lainchaur, Kathmandu", defaultCurrency: "USD" } });
