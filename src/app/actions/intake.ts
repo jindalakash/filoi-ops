@@ -12,7 +12,7 @@ import { applyTemplateTo } from "@/lib/work";
 import { extractTender, extractContract, AiError } from "@/lib/ai/run";
 import type { SourceDoc } from "@/lib/ai/text";
 import type { ActionState } from "@/components/client";
-import type { DeliverableType, DocCategory } from "@prisma/client";
+import type { DocCategory } from "@prisma/client";
 
 const ACCEPT = /\.(pdf|docx|txt|md)$/i;
 
@@ -122,7 +122,7 @@ export async function applyContract(_: ActionState, fd: FormData): Promise<Actio
       const title = str(fd, `dl_title_${i}`);
       if (!title) continue;
       const dl = await db.deliverable.create({
-        data: { projectId, seq: ++seq, title, description: str(fd, `dl_desc_${i}`), type: (str(fd, `dl_type_${i}`) || "DOCUMENT") as DeliverableType, dueDate: d(`dl_due_${i}`) },
+        data: { projectId, seq: ++seq, title, description: str(fd, `dl_desc_${i}`), type: (str(fd, `dl_type_${i}`) || "DOCUMENT"), dueDate: d(`dl_due_${i}`) },
       });
       dlIds.set(`new:${i}`, dl.id);
       if (autoTasks) await applyTemplateTo(dl.id, user.id);

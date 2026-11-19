@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { fieldsFor } from "@/lib/custom";
+import { customRows } from "@/components/CustomFieldView";
 import { can } from "@/lib/permissions";
 import { PageHeader, Card, KV, Notice } from "@/components/ui";
 import { StatusBadge, OPP_STATUS, DueDate } from "@/components/badges";
@@ -82,6 +84,7 @@ export default async function OpportunityPage({ params }: PageProps<"/opportunit
               ["Evaluation", [o.evaluationMethod, o.technicalWeight != null && `${o.technicalWeight}:${o.financialWeight ?? 100 - o.technicalWeight}`].filter(Boolean).join(" · ") || "—"],
               ["Owner", o.owner?.name],
               ["Submitted on", date(o.submittedAt)],
+              ...customRows(await fieldsFor("PROPOSAL"), o.custom, new Map((await db.user.findMany({ select: { id: true, name: true } })).map((u) => [u.id, u.name]))),
             ]} />
           </Card>
           {(o.scopeSummary || o.eligibility) && (

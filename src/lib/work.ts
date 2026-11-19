@@ -108,3 +108,14 @@ export async function applyTemplateTo(deliverableId: string, actorId: string) {
   if (!list.length) return 0;
   return createDeliverableTasks(dl.id, list.map((t) => ({ title: t.title, dueDate: dueFrom(dl.dueDate, t.daysBefore), assigneeId: dl.ownerId })), actorId, "template");
 }
+
+/** Everything the full task form needs beyond projects & users. */
+export async function workFormExtras() {
+  const { fieldsFor, options } = await import("./custom");
+  const [labels, fields, sources] = await Promise.all([
+    db.workLabel.findMany({ where: { active: true }, orderBy: { seq: "asc" }, select: { id: true, name: true, color: true } }),
+    fieldsFor("WORK_ITEM"),
+    options("issueSource"),
+  ]);
+  return { labels, fields, sources };
+}

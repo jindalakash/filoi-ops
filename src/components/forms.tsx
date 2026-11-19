@@ -2,6 +2,8 @@
 import { Field } from "./ui";
 import { CURRENCIES, inputDate, num } from "@/lib/format";
 import { SubmitButton } from "./client";
+import { CustomFieldInputs } from "./CustomFieldInputs";
+import type { FieldDef, CustomValues } from "@/lib/custom";
 
 type Opt = { id: string; name: string };
 
@@ -32,7 +34,7 @@ type ClientRow = {
   taxId?: string | null; vendorNumber?: string | null; contactName?: string | null; contactEmail?: string | null; contactPhone?: string | null; defaultCurrency?: string; notes?: string | null;
 };
 
-export function ClientFields({ c = {} }: { c?: ClientRow }) {
+export function ClientFields({ c = {}, fields = [], users = [] }: { c?: ClientRow; fields?: FieldDef[]; users?: Opt[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {c.id && <input type="hidden" name="id" value={c.id} />}
@@ -52,6 +54,7 @@ export function ClientFields({ c = {} }: { c?: ClientRow }) {
       <Field label="GST state code" hint="2 digits, e.g. 07 for Delhi"><input name="stateCode" defaultValue={c.stateCode ?? ""} className="input" maxLength={2} /></Field>
       <Field label="Foreign tax ID"><input name="taxId" defaultValue={c.taxId ?? ""} className="input" /></Field>
       <Field label="Notes" className="sm:col-span-2"><textarea name="notes" rows={2} defaultValue={c.notes ?? ""} className="input" /></Field>
+      <CustomFieldInputs fields={fields} values={(c as { custom?: CustomValues }).custom} users={users} className="sm:col-span-2" />
     </div>
   );
 }

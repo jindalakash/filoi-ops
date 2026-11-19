@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { guard, req, str } from "@/lib/form";
 import { logActivity } from "@/lib/activity";
+import { readCustom } from "@/lib/custom";
 import type { ActionState } from "@/components/client";
 import type { ClientType } from "@prisma/client";
 
@@ -32,7 +33,8 @@ export async function saveClient(_: ActionState, fd: FormData): Promise<ActionSt
   if (user.role === "ACCOUNTS" && !fd.get("id")) { /* accounts may add clients too */ }
   return guard(async () => {
     const id = str(fd, "id");
-    const d = data(fd);
+    const custom = await readCustom(fd, "CLIENT", id ? (await db.client.findUnique({ where: { id }, select: { custom: true } }))?.custom : undefined);
+    const d = { ...data(fd), ...(custom ? { custom: custom as object } : {}) };
     const c = id ? await db.client.update({ where: { id }, data: d }) : await db.client.create({ data: d });
     await logActivity(user.id, id ? "update" : "create", "client", c.id, `${id ? "Updated" : "Added"} client ${c.name}`);
     revalidatePath("/clients");

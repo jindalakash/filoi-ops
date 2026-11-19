@@ -1,4 +1,6 @@
 import { requireUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { fieldsFor } from "@/lib/custom";
 import { PageHeader, Card } from "@/components/ui";
 import { ActionForm } from "@/components/client";
 import { ClientFields, FormFooter } from "@/components/forms";
@@ -15,7 +17,7 @@ export default async function NewClient({ searchParams }: { searchParams: Promis
       <Card className="max-w-3xl">
         <ActionForm action={saveClient}>
           {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
-          <ClientFields />
+          <ClientFields fields={await fieldsFor("CLIENT")} users={await db.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } })} />
           <FormFooter label="Create client" cancel="/clients" />
         </ActionForm>
       </Card>

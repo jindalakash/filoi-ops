@@ -5,6 +5,9 @@ import { AutoSelect } from "./client";
 import { setWorkStatus } from "@/app/actions/work";
 import { WORK_TYPE, WORK_PRIORITY, workKey } from "@/lib/work";
 import { date, daysUntil } from "@/lib/format";
+import { LabelChip } from "./LabelChip";
+import { CustomChips } from "./CustomFieldView";
+import type { FieldDef } from "@/lib/custom";
 
 type Tone = "gray" | "blue" | "purple" | "amber" | "green" | "red" | "navy";
 export type Column = { id: string; name: string; category: string; color: string };
@@ -14,13 +17,15 @@ export type WorkRowData = {
   assignee: { name: string } | null;
   project?: { code: string } | null;
   deliverable?: { title: string } | null;
+  labels?: { name: string; color: string }[];
+  custom?: unknown;
 };
 
 export function StatusPill({ s }: { s: { name: string; color: string } }) {
   return <Badge tone={(s.color as Tone) || "gray"}>{s.name}</Badge>;
 }
 
-export function WorkMeta({ i, showProject }: { i: WorkRowData; showProject?: boolean }) {
+export function WorkMeta({ i, showProject, fields }: { i: WorkRowData; showProject?: boolean; fields?: FieldDef[] }) {
   const done = i.status.category === "DONE";
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
@@ -30,19 +35,21 @@ export function WorkMeta({ i, showProject }: { i: WorkRowData; showProject?: boo
       {showProject && i.project && <span>{i.project.code}{i.deliverable ? ` · ${i.deliverable.title}` : ""}</span>}
       <span>{i.assignee?.name ?? "Unassigned"}</span>
       {i.dueDate && <DueDate value={i.dueDate} done={done} />}
+      {i.labels?.map((l) => <LabelChip key={l.name} name={l.name} color={l.color} />)}
+      {fields && <CustomChips fields={fields} values={i.custom} />}
     </div>
   );
 }
 
 /** One task / issue line with an inline status dropdown (when allowed). */
-export function WorkRow({ i, columns, canMove, showProject }: { i: WorkRowData; columns: Column[]; canMove: boolean; showProject?: boolean }) {
+export function WorkRow({ i, columns, canMove, showProject, fields }: { i: WorkRowData; columns: Column[]; canMove: boolean; showProject?: boolean; fields?: FieldDef[] }) {
   const done = i.status.category === "DONE";
   return (
     <li className="flex items-start gap-3 py-2.5">
       <span className={clsx("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", done ? "bg-emerald-600" : i.status.category === "IN_PROGRESS" ? "bg-sky" : "bg-line")} aria-hidden />
       <div className="min-w-0 flex-1">
         <Link href={`/work/${i.number}`} className={clsx("font-medium hover:text-plum", done && "text-ink-soft line-through decoration-ink-soft/40")}>{i.title}</Link>
-        <WorkMeta i={i} showProject={showProject} />
+        <WorkMeta i={i} showProject={showProject} fields={fields} />
       </div>
       <div className="shrink-0">
         {canMove
@@ -56,6 +63,7 @@ export function WorkRow({ i, columns, canMove, showProject }: { i: WorkRowData; 
 export const workRowInclude = {
   status: { select: { name: true, category: true, color: true } },
   assignee: { select: { name: true } },
+  labels: { select: { name: true, color: true }, orderBy: { seq: "asc" } },
 } as const;
 
 /** Response state of a client issue: responded, overdue, or due. */

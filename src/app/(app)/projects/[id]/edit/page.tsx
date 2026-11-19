@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { fieldsFor } from "@/lib/custom";
 import { PageHeader, Card } from "@/components/ui";
 import { ProjectForm } from "@/components/ProjectForm";
 
@@ -16,7 +17,7 @@ export default async function EditProject({ params }: PageProps<"/projects/[id]/
   return (
     <>
       <PageHeader title={`Edit ${p.code}`} back={{ href: `/projects/${id}`, label: p.title }} />
-      <Card className="max-w-5xl"><ProjectForm p={p} clients={clients} users={users} cancel={`/projects/${id}`} /></Card>
+      <Card className="max-w-5xl"><ProjectForm p={p} clients={clients} users={users} cancel={`/projects/${id}`} fields={await fieldsFor("PROJECT")} /></Card>
     </>
   );
 }

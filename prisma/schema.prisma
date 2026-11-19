@@ -72,6 +72,7 @@ model Client {
   contactPhone    String?
   defaultCurrency String     @default("USD")
   notes           String?
+  custom        Json         @default("{}") // admin-defined custom field values, keyed by CustomField.id
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -122,6 +123,7 @@ model Opportunity {
   owner              User?             @relation("OpportunityOwner", fields: [ownerId], references: [id])
   submittedAt        DateTime?
   decisionAt         DateTime?
+  custom        Json         @default("{}") // admin-defined custom field values, keyed by CustomField.id
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
@@ -165,6 +167,7 @@ model Project {
   manager       User?         @relation("ProjectManager", fields: [managerId], references: [id])
   alertEmails   String? // comma separated
   reminderDays  String        @default("5,2,0") // days before due date
+  custom        Json         @default("{}") // admin-defined custom field values, keyed by CustomField.id
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -175,14 +178,6 @@ model Project {
   workItems    WorkItem[]
 }
 
-enum DeliverableType {
-  DOCUMENT
-  SYSTEM
-  REPORT
-  TRAINING
-  DATA
-  OTHER
-}
 
 enum DeliverableStatus {
   NOT_STARTED
@@ -199,7 +194,7 @@ model Deliverable {
   seq         Int               @default(1)
   title       String
   description String?
-  type        DeliverableType   @default(DOCUMENT)
+  type        String            @default("DOCUMENT") // value from the "deliverableType" option list
   status      DeliverableStatus @default(NOT_STARTED)
   dueDate     DateTime?
   ownerId     String?
@@ -207,6 +202,7 @@ model Deliverable {
   alertEmails String? // extra recipients on top of the project's
   submittedAt DateTime?
   acceptedAt  DateTime?
+  custom        Json         @default("{}") // admin-defined custom field values, keyed by CustomField.id
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -669,11 +665,13 @@ model WorkItem {
   reportedAt    DateTime?
   respondBy     DateTime? // target first response
   respondedAt   DateTime? // set on first comment / move out of To do
+  custom        Json         @default("{}") // admin-defined custom field values, keyed by CustomField.id
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
   comments  WorkComment[]
   documents Document[]
+  labels    WorkLabel[]
 
   @@index([projectId])
   @@index([deliverableId])
@@ -707,4 +705,46 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt])
+}
+
+// ── Admin customisation ──
+
+/// Coloured tags on tasks & issues (many-to-many)
+model WorkLabel {
+  id     String     @id @default(cuid())
+  name   String     @unique
+  color  String     @default("gray")
+  seq    Int        @default(0)
+  active Boolean    @default(true)
+  items  WorkItem[]
+}
+
+/// Admin-editable dropdown lists (deliverable types, issue sources…)
+model OptionItem {
+  id     String  @id @default(cuid())
+  list   String // deliverableType | issueSource
+  value  String // stored on records; never changes once used
+  label  String
+  color  String?
+  seq    Int     @default(0)
+  active Boolean @default(true)
+
+  @@unique([list, value])
+}
+
+/// Extra fields an admin adds to a form
+model CustomField {
+  id         String   @id @default(cuid())
+  entity     String // WORK_ITEM | DELIVERABLE | PROJECT | CLIENT | PROPOSAL
+  label      String
+  type       String // TEXT | LONGTEXT | NUMBER | DATE | SELECT | MULTISELECT | USER | CHECKBOX | URL
+  options    String[] // for SELECT / MULTISELECT
+  help       String?
+  required   Boolean  @default(false)
+  showInList Boolean  @default(false) // on board cards / list rows
+  seq        Int      @default(0)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([entity, active])
 }

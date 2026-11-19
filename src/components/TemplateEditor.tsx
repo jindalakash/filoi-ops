@@ -4,10 +4,10 @@ import { ActionForm, SubmitButton } from "./client";
 import { saveTaskTemplates } from "@/app/actions/settings";
 import type { TaskTemplateSettings, TemplateTask } from "@/lib/settings";
 
-const TYPES: [string, string][] = [["REPORT", "Progress report"], ["DOCUMENT", "Document / report"], ["SYSTEM", "System / software"], ["TRAINING", "Training / workshop"], ["DATA", "Data / dataset"], ["OTHER", "Other"]];
 
 /** Edit the standard tasks added under each deliverable type. */
-export function TemplateEditor({ value }: { value: TaskTemplateSettings }) {
+export function TemplateEditor({ value, dlTypes }: { value: TaskTemplateSettings; dlTypes: { value: string; label: string }[] }) {
+  const TYPES = dlTypes.map((t) => [t.value, t.label] as [string, string]);
   const [auto, setAuto] = useState(value.auto);
   const [types, setTypes] = useState<Record<string, TemplateTask[]>>(() => Object.fromEntries(TYPES.map(([k]) => [k, value.types[k] ?? []])));
   const set = (k: string, list: TemplateTask[]) => setTypes((t) => ({ ...t, [k]: list }));

@@ -9,7 +9,10 @@ import { Documents } from "@/components/Documents";
 import { StatusPill, ResponseState } from "@/components/WorkParts";
 import { WorkItemForm } from "@/components/WorkForm";
 import { addWorkComment, deleteWorkItem, setWorkStatus, convertToTask } from "@/app/actions/work";
-import { boardColumns, canEditItem, canMoveItem, workKey, WORK_TYPE, WORK_PRIORITY, ISSUE_SOURCES } from "@/lib/work";
+import { boardColumns, canEditItem, canMoveItem, workKey, WORK_TYPE, WORK_PRIORITY, workFormExtras } from "@/lib/work";
+import { optionLabels } from "@/lib/custom";
+import { customRows } from "@/components/CustomFieldView";
+import { LabelChip } from "@/components/LabelChip";
 import { date, inputDate } from "@/lib/format";
 
 export async function generateMetadata({ params }: PageProps<"/work/[number]">) {
@@ -24,7 +27,7 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
   const i = await db.workItem.findUnique({
     where: { number: n },
     include: {
-      status: true, assignee: { select: { name: true } }, reporter: { select: { name: true } },
+      status: true, assignee: { select: { name: true } }, reporter: { select: { name: true } }, labels: { orderBy: { seq: "asc" } },
       project: { select: { id: true, code: true, title: true, client: { select: { name: true, shortName: true } } } },
       deliverable: { select: { id: true, title: true } },
       comments: { include: { user: { select: { name: true } } }, orderBy: { createdAt: "asc" } },
@@ -32,10 +35,12 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
     },
   });
   if (!i) notFound();
-  const [columns, users, projects] = await Promise.all([
+  const [columns, users, projects, extras, SRC] = await Promise.all([
     boardColumns(),
     db.user.findMany({ where: { active: true }, select: { id: true, name: true, username: true }, orderBy: { name: "asc" } }),
     db.project.findMany({ where: { id: i.projectId }, select: { id: true, code: true, deliverables: { select: { id: true, title: true }, orderBy: { seq: "asc" } } } }),
+    workFormExtras(),
+    optionLabels("issueSource"),
   ]);
   const userName = new Map(users.map((u) => [u.id, u.name]));
   const edit = canEditItem(user, i), move = canMoveItem(user, i);
@@ -46,7 +51,6 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
     CONVERTED: () => "converted this client issue into a task",
   };
   const issue = i.type === "ISSUE";
-  const SRC = Object.fromEntries(ISSUE_SOURCES);
 
   return (
     <>
@@ -64,7 +68,8 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
               <div className="mt-4 border-t border-line pt-4">
                 <Disclosure label="Edit details" className="btn-ghost btn-sm">
                   <WorkItemForm projects={projects} users={users}
-                    item={{ id: i.id, projectId: i.projectId, deliverableId: i.deliverableId, type: i.type, title: i.title, description: i.description, priority: i.priority, assigneeId: i.assigneeId, dueDate: inputDate(i.dueDate), source: i.source, clientContact: i.clientContact, reportedAt: inputDate(i.reportedAt), respondBy: inputDate(i.respondBy) }} />
+                    item={{ id: i.id, projectId: i.projectId, deliverableId: i.deliverableId, type: i.type, title: i.title, description: i.description, priority: i.priority, assigneeId: i.assigneeId, dueDate: inputDate(i.dueDate), source: i.source, clientContact: i.clientContact, reportedAt: inputDate(i.reportedAt), respondBy: inputDate(i.respondBy), labelIds: i.labels.map((l) => l.id), custom: i.custom as Record<string, unknown> }} {...extras}
+                    labels={[...extras.labels, ...i.labels.filter((l) => !l.active).map((l) => ({ id: l.id, name: `${l.name} (retired)`, color: l.color }))]} />
                 </Disclosure>
               </div>
             )}
@@ -112,6 +117,8 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
                   ["Response", <ResponseState key="r" respondBy={i.respondBy} respondedAt={i.respondedAt} />],
                 ] as [string, React.ReactNode][] : []),
                 [issue ? "Fix by" : "Due", <DueDate key="d" value={i.dueDate} done={i.status.category === "DONE"} />],
+                ...(i.labels.length ? [["Labels", <span key="l" className="flex flex-wrap gap-1">{i.labels.map((l) => <LabelChip key={l.id} name={l.name} color={l.color} />)}</span>] as [string, React.ReactNode]] : []),
+                ...customRows(extras.fields, i.custom, userName),
                 ["Project", `${i.project.code} · ${i.project.client.shortName || i.project.client.name}`],
                 ["Deliverable", i.deliverable?.title ?? "—"],
                 ["Created by", `${i.reporter?.name ?? "—"} · ${date(i.createdAt)}`],

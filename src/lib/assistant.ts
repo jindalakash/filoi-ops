@@ -9,7 +9,7 @@ import { CONTRACT_SCHEMA, TENDER_SCHEMA } from "./ai/schemas";
 import { logActivity } from "./activity";
 import { num, date } from "./format";
 import type { CurrentUser } from "./auth";
-import type { CostCategory, DeliverableStatus, DeliverableType } from "@prisma/client";
+import type { CostCategory, DeliverableStatus } from "@prisma/client";
 
 type Tool = { name: string; description: string; input_schema: Anthropic.Beta.BetaTool.InputSchema; run: (input: Record<string, unknown>) => Promise<string> };
 export type PageScope = { label: string; context: string; tools: Tool[]; refreshPaths: string[] };
@@ -101,14 +101,14 @@ CURRENT READING (JSON):\n${JSON.stringify(x.result, null, 1)}\n\nTENDER TEXT:${d
         name: "save_deliverables",
         description: "Create or update deliverables. Give id to update an existing one; omit id to create.",
         input_schema: { type: "object", properties: { items: { type: "array", items: { type: "object", properties: {
-          id: { type: "string" }, title: { type: "string" }, description: { type: "string" }, type: { type: "string", enum: DL_TYPES },
+          id: { type: "string" }, title: { type: "string" }, description: { type: "string" }, type: { type: "string", description: `Deliverable type code, e.g. ${DL_TYPES.join(", ")} (or another type set up in Settings)` },
           due_date: { type: "string", description: "YYYY-MM-DD" }, status: { type: "string", enum: DL_STATUS } }, required: ["title"] } } }, required: ["items"] },
         run: async (input) => {
           const items = (input.items as Record<string, unknown>[]) ?? [];
           let seq = await db.deliverable.count({ where: { projectId: id } });
           let c = 0, upd = 0;
           for (const it of items) {
-            const data = { title: s(it.title) ?? "Untitled", description: s(it.description), ...(it.type ? { type: it.type as DeliverableType } : {}), ...(it.due_date !== undefined ? { dueDate: d(it.due_date) } : {}), ...(it.status ? { status: it.status as DeliverableStatus } : {}) };
+            const data = { title: s(it.title) ?? "Untitled", description: s(it.description), ...(it.type ? { type: String(it.type).toUpperCase() } : {}), ...(it.due_date !== undefined ? { dueDate: d(it.due_date) } : {}), ...(it.status ? { status: it.status as DeliverableStatus } : {}) };
             const ex = s(it.id) ? await db.deliverable.findFirst({ where: { id: s(it.id)!, projectId: id } }) : null;
             if (ex) { await db.deliverable.update({ where: { id: ex.id }, data }); upd++; } else { await db.deliverable.create({ data: { ...data, projectId: id, seq: ++seq } }); c++; }
           }

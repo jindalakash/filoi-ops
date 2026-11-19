@@ -1,5 +1,8 @@
 import { Field } from "./ui";
 import { ActionForm } from "./client";
+import { CustomFieldInputs } from "./CustomFieldInputs";
+import type { FieldDef, CustomValues } from "@/lib/custom";
+
 import { CurrencySelect, PersonSelect, FormFooter } from "./forms";
 import { saveProject } from "@/app/actions/projects";
 import { PROJECT_STATUS } from "./badges";
@@ -8,7 +11,7 @@ import type { Project } from "@prisma/client";
 
 type Opt = { id: string; name: string };
 
-export function ProjectForm({ p, clients, users, cancel }: { p?: Project; clients: Opt[]; users: Opt[]; cancel: string }) {
+export function ProjectForm({ p, clients, users, cancel, fields = [] }: { p?: Project; clients: Opt[]; users: Opt[]; cancel: string; fields?: FieldDef[] }) {
   return (
     <ActionForm action={saveProject}>
       {p && <input type="hidden" name="id" value={p.id} />}
@@ -34,6 +37,7 @@ export function ProjectForm({ p, clients, users, cancel }: { p?: Project; client
         <Field label="Alert emails" hint="Comma-separated. Receives deliverable & invoicing reminders." className="sm:col-span-2"><input name="alertEmails" defaultValue={p?.alertEmails ?? ""} className="input" placeholder="pm@filoi.in, accounts@filoi.in" /></Field>
         <Field label="Remind days before due" hint="e.g. 5,2,0 → 5 days, 2 days and on the day"><input name="reminderDays" defaultValue={p?.reminderDays ?? "5,2,0"} className="input" /></Field>
       </div>
+      <CustomFieldInputs fields={fields} values={p?.custom as CustomValues | undefined} users={users} className="mt-5" />
       <FormFooter label={p ? "Save changes" : "Create project"} cancel={cancel} />
     </ActionForm>
   );

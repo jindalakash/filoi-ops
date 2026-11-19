@@ -10,6 +10,8 @@ import { listBackups, BACKUP_DIR } from "@/lib/backup";
 import { Download } from "lucide-react";
 import { AiSettingsForm } from "@/components/AiSettingsForm";
 import { TemplateEditor } from "@/components/TemplateEditor";
+import { ColumnsEditor, LabelsEditor, ListEditor, FieldsEditor } from "@/components/CustomiseEditors";
+import { LISTS, ENTITIES, FIELD_TYPES, options, type ListKey } from "@/lib/custom";
 
 export const metadata = { title: "Settings" };
 
@@ -18,8 +20,20 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const { tab = "company" } = await searchParams;
   const [company, smtp, rem, fx, ai, bk, tpl] = await Promise.all([getSetting("company"), getSetting("smtp"), getSetting("reminders"), getSetting("fx"), getSetting("ai"), getSetting("backup"), getSetting("taskTemplates")]);
   const backups = tab === "backups" ? await listBackups() : [];
+  const cust = tab === "customise" ? await (async () => {
+    const [cols, labels, opts, fields, dlTypes, sources] = await Promise.all([
+      db.workStatus.findMany({ orderBy: { seq: "asc" }, include: { _count: { select: { items: true } } } }),
+      db.workLabel.findMany({ orderBy: { seq: "asc" }, include: { _count: { select: { items: true } } } }),
+      db.optionItem.findMany({ orderBy: { seq: "asc" } }),
+      db.customField.findMany({ orderBy: [{ seq: "asc" }, { createdAt: "asc" }] }),
+      db.deliverable.groupBy({ by: ["type"], _count: true }),
+      db.workItem.groupBy({ by: ["source"], _count: true }),
+    ]);
+    const used: Record<string, Map<string | null, number>> = { deliverableType: new Map(dlTypes.map((x) => [x.type, x._count])), issueSource: new Map(sources.map((x) => [x.source, x._count])) };
+    return { cols, labels, opts, fields, used };
+  })() : null;
   const logs = tab === "reminders" ? await db.notificationLog.findMany({ orderBy: { createdAt: "desc" }, take: 25 }) : [];
-  const tabs = [["company", "Company & GST"], ["email", "Email"], ["reminders", "Reminders"], ["templates", "Task templates"], ["currency", "Currencies"], ["ai", "AI (beta)"], ["backups", "Backups"]].map(([key, label]) => ({ key, label, href: `?tab=${key}` }));
+  const tabs = [["company", "Company & GST"], ["email", "Email"], ["reminders", "Reminders"], ["customise", "Lists & fields"], ["templates", "Task templates"], ["currency", "Currencies"], ["ai", "AI (beta)"], ["backups", "Backups"]].map(([key, label]) => ({ key, label, href: `?tab=${key}` }));
 
   return (
     <>
@@ -119,10 +133,42 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
+      {tab === "customise" && cust && (
+        <div className="max-w-6xl space-y-6">
+          <p className="text-sm text-ink-soft">Shape the app around how Filoi works. Built-in fields that drive money, tax and reminders (amounts, GST/LUT, currencies, due dates) stay fixed so invoices and reminders can&apos;t break.</p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card title="Board columns">
+              <p className="mb-3 text-xs text-ink-soft">“Counts as” tells progress what a column means — rename freely. A column with cards can&apos;t be removed or retired until they&apos;re moved.</p>
+              <ColumnsEditor value={cust.cols.map((c) => ({ id: c.id, name: c.name, category: c.category, color: c.color, active: c.active, count: c._count.items }))} />
+            </Card>
+            <Card title="Task labels">
+              <p className="mb-3 text-xs text-ink-soft">Coloured tags for tasks and client issues — filter the board by them.</p>
+              <LabelsEditor value={cust.labels.map((l) => ({ id: l.id, name: l.name, color: l.color, active: l.active, count: l._count.items }))} />
+            </Card>
+            {(Object.keys(LISTS) as ListKey[]).map((k) => (
+              <Card key={k} title={LISTS[k].label}>
+                <p className="mb-3 text-xs text-ink-soft">{LISTS[k].hint} Options in use can be renamed or retired, not deleted.</p>
+                <ListEditor list={k} value={cust.opts.filter((o) => o.list === k).map((o) => ({ id: o.id, value: o.value, label: o.label, active: o.active, count: cust.used[k].get(o.value) ?? 0 }))} />
+              </Card>
+            ))}
+          </div>
+          <h2 className="pt-2 text-lg font-semibold">Custom fields</h2>
+          <p className="-mt-4 text-sm text-ink-soft">Extra fields appear under “More details” in each form and on the detail page. Tick “Show in lists” to see them on board cards and list rows.</p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {(Object.keys(ENTITIES) as (keyof typeof ENTITIES)[]).map((e) => (
+              <Card key={e} title={ENTITIES[e]}>
+                <FieldsEditor entity={e} types={Object.entries(FIELD_TYPES)}
+                  value={cust.fields.filter((f) => f.entity === e).map((f) => ({ id: f.id, label: f.label, type: f.type, options: f.options.join("\n"), help: f.help ?? "", required: f.required, showInList: f.showInList, active: f.active }))} />
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {tab === "templates" && (
         <Card title="Standard tasks per deliverable type" className="max-w-6xl">
           <p className="mb-4 text-sm text-ink-soft">Each deliverable of a type gets these tasks, due a set number of days before the deliverable. You can also add them later from <b>Delivery</b> (“Add template tasks”).</p>
-          <TemplateEditor value={tpl} />
+          <TemplateEditor value={tpl} dlTypes={await options("deliverableType")} />
         </Card>
       )}
 

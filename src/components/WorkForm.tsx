@@ -2,10 +2,14 @@
 import { useState } from "react";
 import { ActionForm, SubmitButton } from "./client";
 import { saveWorkItem } from "@/app/actions/work";
+import { CustomFieldInputs } from "./CustomFieldInputs";
+import { LabelChip } from "./LabelChip";
+import type { FieldDef, CustomValues } from "@/lib/custom";
 
 type Opt = { id: string; name: string };
 export type ProjectOpt = { id: string; code: string; deliverables: { id: string; title: string }[] };
-export type WorkItemEdit = { id: string; projectId: string; deliverableId: string | null; type: string; title: string; description: string | null; priority: string; assigneeId: string | null; dueDate: string; source?: string | null; clientContact?: string | null; reportedAt?: string; respondBy?: string };
+export type WorkItemEdit = { id: string; projectId: string; deliverableId: string | null; type: string; title: string; description: string | null; priority: string; assigneeId: string | null; dueDate: string; source?: string | null; clientContact?: string | null; reportedAt?: string; respondBy?: string; labelIds?: string[]; custom?: CustomValues };
+export type LabelOpt = { id: string; name: string; color: string };
 
 const TYPES = [["TASK", "Task"], ["ISSUE", "Client issue"], ["CHANGE", "Change request"]];
 const PRIORITIES = [["URGENT", "Urgent"], ["HIGH", "High"], ["MEDIUM", "Medium"], ["LOW", "Low"]];
@@ -17,8 +21,9 @@ const plusDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + 
  * New / edit task or issue.
  * `compact`: one-line quick add under a deliverable (project & deliverable fixed).
  */
-export function WorkItemForm({ projects, users, item, projectId, deliverableId, statusId, type, compact, onDone }: {
+export function WorkItemForm({ projects, users, item, projectId, deliverableId, statusId, type, compact, onDone, labels = [], fields = [], sources }: {
   projects: ProjectOpt[]; users: Opt[]; item?: WorkItemEdit; projectId?: string; deliverableId?: string; statusId?: string; type?: string; compact?: boolean; onDone?: () => void;
+  labels?: LabelOpt[]; fields?: FieldDef[]; sources?: { value: string; label: string }[];
 }) {
   const [pid, setPid] = useState(item?.projectId ?? projectId ?? projects[0]?.id ?? "");
   const [did, setDid] = useState(item?.deliverableId ?? deliverableId ?? "");
@@ -74,13 +79,28 @@ export function WorkItemForm({ projects, users, item, projectId, deliverableId, 
             <label className="block"><span className="label">Reported by</span>
               <input name="clientContact" defaultValue={item?.clientContact ?? ""} className="input" placeholder="e.g. Dr Ana Ruiz, PAHO" /></label>
             <label className="block"><span className="label">How</span>
-              <select name="source" defaultValue={item?.source ?? "EMAIL"} className="input">{SOURCES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+              <select name="source" defaultValue={item?.source ?? (sources?.[0]?.value ?? "EMAIL")} className="input">{(sources ?? SOURCES.map(([value, label]) => ({ value, label }))).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label>
             <label className="block"><span className="label">Reported on</span>
               <input type="date" name="reportedAt" defaultValue={item?.reportedAt ?? defaults.today} className="input" /></label>
             <label className="block"><span className="label">Respond by</span>
               <input type="date" name="respondBy" defaultValue={item?.respondBy ?? (item ? "" : defaults.respond)} className="input" /></label>
           </>
         )}
+        {labels.length > 0 && (
+          <fieldset className="sm:col-span-2 lg:col-span-4">
+            <input type="hidden" name="labels__present" value="1" />
+            <legend className="label">Labels</legend>
+            <div className="flex flex-wrap gap-2">
+              {labels.map((l) => (
+                <label key={l.id} className="flex cursor-pointer items-center gap-1.5 rounded-full border border-line px-2 py-1 has-[:checked]:border-sky has-[:checked]:bg-sky/5">
+                  <input type="checkbox" name="labelIds" value={l.id} defaultChecked={item?.labelIds?.includes(l.id)} className="h-3.5 w-3.5 accent-plum" />
+                  <LabelChip name={l.name} color={l.color} />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
+        <CustomFieldInputs fields={fields} values={item?.custom} users={users} />
       </div>
       <div className="mt-3 flex justify-end"><SubmitButton className="btn-dark btn-sm">{item ? "Save" : "Create"}</SubmitButton></div>
     </ActionForm>

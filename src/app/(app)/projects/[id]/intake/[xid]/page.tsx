@@ -8,7 +8,7 @@ import { dashes } from "@/lib/ai/prefill";
 import { PageHeader, Card, Notice } from "@/components/ui";
 import { ActionForm, ConfirmAction, SubmitButton } from "@/components/client";
 import { AiEvidence } from "@/components/AiEvidence";
-import { DL_TYPES } from "@/components/ProjectParts";
+import { options } from "@/lib/custom";
 import { applyContract, discardExtraction } from "@/app/actions/intake";
 import { CURRENCIES, date, money, num } from "@/lib/format";
 
@@ -19,9 +19,10 @@ const okDate = (raw?: string | null) => { const s = dashes(raw); return s && /^\
 export default async function ContractIntake({ params }: PageProps<"/projects/[id]/intake/[xid]">) {
   const user = await requireUser("projects");
   const { id, xid } = await params;
-  const [p, x] = await Promise.all([
+  const [p, x, dlTypes] = await Promise.all([
     db.project.findUnique({ where: { id }, include: { deliverables: { select: { id: true, title: true } } } }),
     loadIntake<ContractExtraction>(xid, "CONTRACT"),
+    options("deliverableType"),
   ]);
   if (!p || !x || x.projectId !== id) notFound();
   const c = x.data;
@@ -73,7 +74,7 @@ export default async function ContractIntake({ params }: PageProps<"/projects/[i
                       <input name={`dl_title_${i}`} defaultValue={d.title} className="input font-semibold" />
                       <textarea name={`dl_desc_${i}`} defaultValue={d.description ?? ""} rows={2} className="input mt-1.5 text-xs" placeholder="Description / acceptance criteria" />
                     </td>
-                    <td><select name={`dl_type_${i}`} defaultValue={d.type} className="input min-w-36">{DL_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></td>
+                    <td><select name={`dl_type_${i}`} defaultValue={d.type} className="input min-w-36">{dlTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></td>
                     <td><input type="date" name={`dl_due_${i}`} defaultValue={okDate(d.due_date)} className="input min-w-36" />{d.timing && <div className="mt-1 text-xs text-ink-soft">“{d.timing}”</div>}</td>
                   </tr>
                 ))}</tbody>

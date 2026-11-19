@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { fieldsFor } from "@/lib/custom";
 import { PageHeader, Card } from "@/components/ui";
 import { ActionForm } from "@/components/client";
 import { ClientFields, FormFooter } from "@/components/forms";
@@ -14,7 +15,7 @@ export default async function EditClient({ params }: PageProps<"/clients/[id]/ed
   return (
     <>
       <PageHeader title={`Edit ${c.name}`} back={{ href: `/clients/${id}`, label: c.name }} />
-      <Card className="max-w-3xl"><ActionForm action={saveClient}><ClientFields c={c} /><FormFooter cancel={`/clients/${id}`} /></ActionForm></Card>
+      <Card className="max-w-3xl"><ActionForm action={saveClient}><ClientFields c={c} fields={await fieldsFor("CLIENT")} users={await db.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } })} /><FormFooter cancel={`/clients/${id}`} /></ActionForm></Card>
     </>
   );
 }

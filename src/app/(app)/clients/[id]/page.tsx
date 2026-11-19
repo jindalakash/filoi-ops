@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { fieldsFor } from "@/lib/custom";
+import { customRows } from "@/components/CustomFieldView";
 import { can } from "@/lib/permissions";
 import { PageHeader, Card, KV, Empty } from "@/components/ui";
 import { StatusBadge, OPP_STATUS, PROJECT_STATUS } from "@/components/badges";
@@ -37,6 +39,7 @@ export default async function ClientPage({ params }: PageProps<"/clients/[id]">)
             ["Contact", c.contactName], ["Email", c.contactEmail], ["Phone", c.contactPhone],
             ["Default currency", c.defaultCurrency], ["Vendor no.", c.vendorNumber], ["GSTIN", c.gstin],
             ["Address", c.address && <span className="whitespace-pre-line">{c.address}</span>], ["Notes", c.notes],
+            ...customRows(await fieldsFor("CLIENT"), c.custom, new Map((await db.user.findMany({ select: { id: true, name: true } })).map((u) => [u.id, u.name]))),
           ]} />
         </Card>
         <Card title="Proposals" pad={false}>

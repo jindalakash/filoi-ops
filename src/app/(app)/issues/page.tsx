@@ -7,12 +7,12 @@ import { Badge, DueDate } from "@/components/badges";
 import { Disclosure } from "@/components/client";
 import { StatusPill, ResponseState } from "@/components/WorkParts";
 import { WorkItemForm } from "@/components/WorkForm";
-import { WORK_PRIORITY, ISSUE_SOURCES, workKey } from "@/lib/work";
+import { WORK_PRIORITY, workKey, workFormExtras } from "@/lib/work";
+import { optionLabels } from "@/lib/custom";
 import { date } from "@/lib/format";
 import type { Prisma } from "@prisma/client";
 
 export const metadata = { title: "Client issues" };
-const SRC = Object.fromEntries(ISSUE_SOURCES);
 
 export default async function IssuesPage({ searchParams }: { searchParams: Promise<{ v?: string; project?: string }> }) {
   await requireUser();
@@ -25,7 +25,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Promi
     all: base,
   };
   const views = [["open", "Open"], ["waiting", "Awaiting first response"], ["resolved", "Resolved"], ["all", "All"]];
-  const [counts, items, projects, users] = await Promise.all([
+  const [counts, items, projects, users, extras, SRC] = await Promise.all([
     Promise.all(views.map(async ([k]) => [k, await db.workItem.count({ where: where[k] })] as const)).then(Object.fromEntries),
     db.workItem.findMany({
       where: where[v] ?? where.open,
@@ -35,6 +35,8 @@ export default async function IssuesPage({ searchParams }: { searchParams: Promi
     }),
     db.project.findMany({ where: { status: "ACTIVE" }, select: { id: true, code: true, deliverables: { select: { id: true, title: true }, orderBy: { seq: "asc" } } }, orderBy: { code: "asc" } }),
     db.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    workFormExtras(),
+    optionLabels("issueSource"),
   ]);
   // most severe first among open ones
   if (v !== "resolved" && v !== "all") items.sort((a, b) => WORK_PRIORITY[a.priority].rank - WORK_PRIORITY[b.priority].rank);
@@ -47,7 +49,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Promi
       {projects.length > 0 && (
         <div className="mb-4">
           <Disclosure label="+ Log client issue" className="btn-primary">
-            <WorkItemForm projects={projects} users={users} type="ISSUE" projectId={project} />
+            <WorkItemForm projects={projects} users={users} type="ISSUE" projectId={project} {...extras} />
           </Disclosure>
         </div>
       )}

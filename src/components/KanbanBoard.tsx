@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { moveWorkItem } from "@/app/actions/work";
 import { play } from "@/lib/sound";
+import { LabelChip } from "./LabelChip";
 
 export type BoardCard = {
   id: string; number: number; title: string; type: string; priority: string;
   statusId: string; position: number; due: string | null; overdue: boolean;
   assignee: string | null; project: string; deliverable: string | null; canMove: boolean;
+  labels: { name: string; color: string }[]; chips: string[];
 };
 type Col = { id: string; name: string; category: string; color: string };
 
@@ -88,6 +90,12 @@ export function KanbanBoard({ columns, cards: initial }: { columns: Col[]; cards
                       </div>
                       <div className="mt-1 text-sm font-medium leading-snug">{c.title}</div>
                       {c.deliverable && <div className="mt-1 truncate text-xs text-ink-soft">↳ {c.deliverable}</div>}
+                      {(c.labels.length > 0 || c.chips.length > 0) && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {c.labels.map((l) => <LabelChip key={l.name} name={l.name} color={l.color} />)}
+                          {c.chips.map((t) => <span key={t} className="rounded-full bg-mist px-1.5 py-px text-[11px] text-ink-soft ring-1 ring-inset ring-line">{t}</span>)}
+                        </div>
+                      )}
                       <div className="mt-2 flex items-center justify-between gap-2 text-xs">
                         <span className={clsx(c.overdue ? "font-semibold text-red-700" : "text-ink-soft")}>{c.due ?? ""}</span>
                         {c.assignee

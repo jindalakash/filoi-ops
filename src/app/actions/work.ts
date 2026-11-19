@@ -7,6 +7,7 @@ import { guard, req, str, dateOf, FormError } from "@/lib/form";
 import { logActivity } from "@/lib/activity";
 import { canEditItem, canMoveItem, notifyWorkAssigned, workKey, applyTemplateTo } from "@/lib/work";
 import { notifyUsers, mentionedUsers, commentHtml } from "@/lib/notify";
+import { readCustom } from "@/lib/custom";
 import type { ActionState } from "@/components/client";
 import type { WorkPriority, WorkType } from "@prisma/client";
 
@@ -76,8 +77,11 @@ export async function saveWorkItem(_: ActionState, fd: FormData): Promise<Action
         respondBy: dateOf(fd, "respondBy") ?? null,
       } : {}),
     };
+    const custom = await readCustom(fd, "WORK_ITEM", before?.custom);
+    const labelIds = fd.has("labels__present") ? fd.getAll("labelIds").map(String) : undefined;
+    const extra = { ...(custom ? { custom: custom as object } : {}) };
     if (before) {
-      const item = await db.workItem.update({ where: { id: before.id }, data });
+      const item = await db.workItem.update({ where: { id: before.id }, data: { ...data, ...extra, ...(labelIds ? { labels: { set: labelIds.map((id) => ({ id })) } } : {}) } });
       if (item.assigneeId && item.assigneeId !== before.assigneeId) {
         await db.workComment.create({ data: { itemId: item.id, userId: user.id, kind: "ASSIGNED", body: item.assigneeId } });
         await notifyWorkAssigned(item.id, user.id);
@@ -87,7 +91,7 @@ export async function saveWorkItem(_: ActionState, fd: FormData): Promise<Action
     }
     const status = await statusOrDefault(str(fd, "statusId"));
     const item = await db.workItem.create({
-      data: { ...data, projectId, statusId: status.id, reporterId: user.id, position: await nextPosition(status.id), completedAt: status.category === "DONE" ? new Date() : null },
+      data: { ...data, ...extra, ...(labelIds?.length ? { labels: { connect: labelIds.map((id) => ({ id })) } } : {}), projectId, statusId: status.id, reporterId: user.id, position: await nextPosition(status.id), completedAt: status.category === "DONE" ? new Date() : null },
     });
     await db.workComment.create({ data: { itemId: item.id, userId: user.id, kind: "CREATED" } });
     await logActivity(user.id, "create", "work", item.id, `${workKey(item.number)} “${item.title}” created`);

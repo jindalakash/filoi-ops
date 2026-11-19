@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { guard, req, str, dateOf, numOf, intOf } from "@/lib/form";
 import { nextOpportunityCode, nextProjectCode } from "@/lib/codes";
 import { logActivity } from "@/lib/activity";
+import { readCustom } from "@/lib/custom";
 import { OPP_STATUS } from "@/components/badges";
 import type { ActionState } from "@/components/client";
 import type { OpportunityStatus } from "@prisma/client";
@@ -44,9 +45,11 @@ export async function saveOpportunity(_: ActionState, fd: FormData): Promise<Act
       alertEmails: str(fd, "alertEmails"),
       ownerId: str(fd, "ownerId"),
     };
+    const custom = await readCustom(fd, "PROPOSAL", id ? (await db.opportunity.findUnique({ where: { id }, select: { custom: true } }))?.custom : undefined);
+    const dd = { ...d, ...(custom ? { custom: custom as object } : {}) };
     const o = id
-      ? await db.opportunity.update({ where: { id }, data: d })
-      : await db.opportunity.create({ data: { ...d, code: await nextOpportunityCode(), ownerId: d.ownerId ?? user.id } });
+      ? await db.opportunity.update({ where: { id }, data: dd })
+      : await db.opportunity.create({ data: { ...dd, code: await nextOpportunityCode(), ownerId: d.ownerId ?? user.id } });
     await logActivity(user.id, id ? "update" : "create", "opportunity", o.id, `${id ? "Updated" : "Created"} proposal ${o.code}`);
     // documents read by AI on the intake screen now belong to this proposal
     const intakeId = str(fd, "intakeId");

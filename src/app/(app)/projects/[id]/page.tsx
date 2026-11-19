@@ -8,7 +8,9 @@ import { StatusBadge, PROJECT_STATUS, DL_STATUS, MS_STATUS, INV_STATUS, DueDate,
 import { AutoSelect, ConfirmAction, Disclosure } from "@/components/client";
 import { Documents } from "@/components/Documents";
 import { ActivityFeed } from "@/components/ActivityFeed";
-import { DeliverableForm, MilestoneForm, DL_TYPES } from "@/components/ProjectParts";
+import { DeliverableForm, MilestoneForm } from "@/components/ProjectParts";
+import { options, optionLabels, fieldsFor } from "@/lib/custom";
+import { customRows, CustomChips } from "@/components/CustomFieldView";
 import { ProgressLine, deliverableProgress, deliverablePct, progressItems } from "@/components/DeliverableProgress";
 import { setDeliverableStatus, deleteDeliverable, deleteProject } from "@/app/actions/projects";
 import { deleteMilestone } from "@/app/actions/finance";
@@ -59,7 +61,8 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const scheduled = p.milestones.reduce((a, m) => a + num(m.amount), 0);
   const dlDone = p.deliverables.filter((d) => d.status === "ACCEPTED").length;
   const dlProg = deliverableProgress(p.deliverables);
-  const typeLabel = Object.fromEntries(DL_TYPES);
+  const [dlTypes, typeLabel, dlFields, pFields, everyone] = await Promise.all([options("deliverableType"), optionLabels("deliverableType"), fieldsFor("DELIVERABLE"), fieldsFor("PROJECT"), db.user.findMany({ select: { id: true, name: true } })]);
+  const userNames = new Map(everyone.map((u) => [u.id, u.name]));
 
   const tabs = [
     { key: "deliverables", label: "Deliverables", href: `?tab=deliverables`, count: p.deliverables.length },
@@ -112,7 +115,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
         <div className="space-y-4">
           {editPM && (
             <Disclosure label="+ Add deliverable" className="btn-primary">
-              <DeliverableForm projectId={id} users={users} withBilling={finEdit} currency={p.currency} />
+              <DeliverableForm projectId={id} users={users} withBilling={finEdit} currency={p.currency} types={dlTypes} fields={dlFields} />
             </Disclosure>
           )}
           {p.deliverables.length > 0 && <Card><ProgressLine rows={p.deliverables} big /></Card>}
@@ -125,7 +128,8 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold">{d.title}</span>
-                          <Badge tone="navy">{typeLabel[d.type]}</Badge>
+                          <Badge tone="navy">{typeLabel[d.type] ?? d.type}</Badge>
+                          <CustomChips fields={dlFields} values={d.custom} userNames={userNames} />
                           {fin && d.milestones.map((m) => <Badge key={m.id} tone="purple"><Amt v={m.amount} c={p.currency} compact /></Badge>)}
                         </div>
                         {d.description && <p className="mt-1 text-sm text-ink-soft">{d.description}</p>}
@@ -149,7 +153,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                     {editPM && (
                       <div className="mt-2">
                         <Disclosure label="Edit" className="text-xs font-semibold text-sky hover:underline">
-                          <DeliverableForm projectId={id} d={d} users={users} currency={p.currency} />
+                          <DeliverableForm projectId={id} d={d} users={users} currency={p.currency} types={dlTypes} fields={dlFields} />
                         </Disclosure>
                       </div>
                     )}
@@ -224,6 +228,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
               ["Start", date(p.startDate)], ["End", date(p.endDate)], ["Project manager", p.manager?.name],
               ["From proposal", p.opportunity ? <Link className="link" href={`/opportunities/${p.opportunity.id}`}>{p.opportunity.code}</Link> : "—"],
               ["Reminder days", p.reminderDays], ["Alert emails", splitEmails(p.alertEmails).join(", ") || "—"],
+              ...customRows(pFields, p.custom, userNames),
             ]} />
             {p.description && <div className="mt-5"><div className="label">Scope</div><p className="whitespace-pre-line text-sm">{p.description}</p></div>}
           </Card>

@@ -5,13 +5,14 @@ import { PageHeader } from "@/components/ui";
 import { Disclosure } from "@/components/client";
 import { KanbanBoard, type BoardCard } from "@/components/KanbanBoard";
 import { WorkItemForm } from "@/components/WorkForm";
-import { boardColumns, canMoveItem } from "@/lib/work";
+import { boardColumns, canMoveItem, workFormExtras } from "@/lib/work";
 import { date, daysUntil } from "@/lib/format";
+import { formatCustom } from "@/lib/custom";
 import type { Prisma } from "@prisma/client";
 
 export const metadata = { title: "Board" };
 
-type SP = { project?: string; who?: string; type?: string; deliverable?: string };
+type SP = { project?: string; who?: string; type?: string; deliverable?: string; label?: string };
 
 export default async function BoardPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
@@ -22,24 +23,29 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
     ...(sp.project ? { projectId: sp.project } : {}),
     ...(sp.deliverable ? { deliverableId: sp.deliverable } : {}),
     ...(sp.type ? { type: sp.type as Prisma.EnumWorkTypeFilter["equals"] } : {}),
+    ...(sp.label ? { labels: { some: { id: sp.label } } } : {}),
     ...(sp.who === "me" ? { assigneeId: user.id } : sp.who === "none" ? { assigneeId: null } : sp.who ? { assigneeId: sp.who } : {}),
     // keep the Done column short: finished in the last 30 days
     OR: [{ completedAt: null }, { completedAt: { gte: since } }],
   };
-  const [columns, items, projects, users] = await Promise.all([
+  const [columns, items, projects, users, extras] = await Promise.all([
     boardColumns(),
-    db.workItem.findMany({ where, include: { assignee: { select: { name: true } }, project: { select: { code: true } }, deliverable: { select: { title: true } } }, orderBy: { position: "asc" } }),
+    db.workItem.findMany({ where, include: { assignee: { select: { name: true } }, project: { select: { code: true } }, deliverable: { select: { title: true } }, labels: { select: { name: true, color: true }, orderBy: { seq: "asc" } } }, orderBy: { position: "asc" } }),
     db.project.findMany({ where: { status: "ACTIVE" }, select: { id: true, code: true, deliverables: { select: { id: true, title: true }, orderBy: { seq: "asc" } } }, orderBy: { code: "asc" } }),
     db.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    workFormExtras(),
   ]);
+  const userNames = new Map(users.map((u) => [u.id, u.name]));
   const doneIds = new Set(columns.filter((c) => c.category === "DONE").map((c) => c.id));
   const cards: BoardCard[] = items.map((i) => ({
     id: i.id, number: i.number, title: i.title, type: i.type, priority: i.priority, statusId: i.statusId, position: i.position,
     due: i.dueDate ? date(i.dueDate) : null, overdue: !!i.dueDate && !doneIds.has(i.statusId) && (daysUntil(i.dueDate) ?? 0) < 0,
     assignee: i.assignee?.name ?? null, project: i.project.code, deliverable: i.deliverable?.title ?? null, canMove: canMoveItem(user, i),
+    labels: i.labels,
+    chips: extras.fields.filter((f) => f.showInList).flatMap((f) => { const t = formatCustom(f, (i.custom as Record<string, unknown>)[f.id], userNames); return t === null || (f.type === "CHECKBOX" && t === "No") ? [] : [f.type === "CHECKBOX" ? f.label : `${f.label}: ${t}`]; }),
   }));
   const deliverables = sp.project ? projects.find((p) => p.id === sp.project)?.deliverables ?? [] : [];
-  const filtered = !!(sp.project || sp.who || sp.type || sp.deliverable);
+  const filtered = !!(sp.project || sp.who || sp.type || sp.deliverable || sp.label);
 
   return (
     <>
@@ -57,6 +63,10 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
             <select name="who" defaultValue={sp.who ?? ""} className="input !w-44 !py-1.5"><option value="">Everyone</option><option value="me">Me</option><option value="none">Unassigned</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
           <label className="block"><span className="label">Type</span>
             <select name="type" defaultValue={sp.type ?? ""} className="input !w-40 !py-1.5"><option value="">All types</option><option value="TASK">Tasks</option><option value="ISSUE">Client issues</option><option value="CHANGE">Change requests</option></select></label>
+          {extras.labels.length > 0 && (
+            <label className="block"><span className="label">Label</span>
+              <select name="label" defaultValue={sp.label ?? ""} className="input !w-40 !py-1.5"><option value="">Any label</option>{extras.labels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+          )}
           <button className="btn-dark btn-sm">Apply</button>
           {filtered && <Link href="/board" className="btn-ghost btn-sm">Clear</Link>}
         </form>
@@ -64,7 +74,7 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
       {projects.length > 0 && (
         <div className="mb-4">
           <Disclosure label="+ New task or issue" className="btn-primary">
-            <WorkItemForm projects={projects} users={users} projectId={sp.project} deliverableId={sp.deliverable} />
+            <WorkItemForm projects={projects} users={users} projectId={sp.project} deliverableId={sp.deliverable} {...extras} />
           </Disclosure>
         </div>
       )}

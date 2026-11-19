@@ -10,7 +10,7 @@ import { setDeliverableStatus } from "@/app/actions/projects";
 import { ProgressLine, ProgressBar, deliverablePct } from "@/components/DeliverableProgress";
 import { WorkRow, workRowInclude } from "@/components/WorkParts";
 import { WorkItemForm } from "@/components/WorkForm";
-import { boardColumns, canMoveItem } from "@/lib/work";
+import { boardColumns, canMoveItem, workFormExtras } from "@/lib/work";
 import { KanbanSquare, Sparkles } from "lucide-react";
 import { CollapsibleGroup, CollapseAllButtons } from "@/components/CollapsibleGroup";
 import { ActionForm, SubmitButton } from "@/components/client";
@@ -19,6 +19,8 @@ import { applyTemplate, applyTemplatesToProject } from "@/app/actions/work";
 import { aiSplitDeliverable } from "@/app/actions/workplan";
 import { getSetting } from "@/lib/settings";
 import { aiReady } from "@/lib/ai/run";
+import { fieldsFor } from "@/lib/custom";
+import { CustomChips } from "@/components/CustomFieldView";
 
 export const metadata = { title: "Delivery" };
 
@@ -29,10 +31,12 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
   const in30 = new Date(today.getTime() + 30 * 86400000);
 
   const edit = can(user.role, "projects");
-  const [tpl, ai, plans] = await Promise.all([
+  const [tpl, ai, plans, extras, dlFields] = await Promise.all([
     getSetting("taskTemplates"),
     edit ? aiReady() : Promise.resolve(false),
     edit ? db.aiExtraction.findMany({ where: { kind: "WORKPLAN", status: "READY" }, select: { id: true, result: true } }) : Promise.resolve([]),
+    workFormExtras(),
+    fieldsFor("DELIVERABLE"),
   ]);
   const planFor = new Map(plans.map((x) => [(x.result as { deliverableId?: string }).deliverableId, x.id]));
   const tplCount = (type: string) => (tpl.types[type] ?? []).length;
@@ -81,7 +85,7 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
         <div className="mb-4 space-y-4">
           {projects.length > 1 && <Card><ProgressLine rows={allRows} label="All active projects" sub={`${projects.length} projects · ${allRows.length} deliverables`} big /></Card>}
           <Disclosure label="+ New task or issue" className="btn-primary">
-            <WorkItemForm projects={projectOpts} users={users} />
+            <WorkItemForm projects={projectOpts} users={users} {...extras} />
           </Disclosure>
         </div>
       )}
@@ -126,6 +130,7 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
                             <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-soft">
                               <span>Due <DueDate value={d.dueDate} done={d.status === "ACCEPTED"} /></span>
                               <span>{d.owner?.name ?? "No owner"}</span>
+                              <CustomChips fields={dlFields} values={d.custom} />
                             </div>
                           </div>
                           <div className="flex items-center gap-3 md:w-80">
@@ -144,7 +149,7 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
                           <div className="mt-2 rounded-lg border border-line/70 bg-mist/30 px-4 py-2">
                             {d.workItems.length > 0 && (
                               <ul className="mb-2 divide-y divide-line/70">
-                                {d.workItems.map((w) => <WorkRow key={w.id} i={w} columns={colOpts} canMove={canMoveItem(user, w)} />)}
+                                {d.workItems.map((w) => <WorkRow key={w.id} i={w} columns={colOpts} canMove={canMoveItem(user, w)} fields={extras.fields} />)}
                               </ul>
                             )}
                             <div className="py-2"><WorkItemForm compact projects={projectOpts} users={users} projectId={p.id} deliverableId={d.id} /></div>
@@ -171,7 +176,7 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
                 <details className="border-t border-line">
                   <summary className="cursor-pointer px-5 py-3 text-sm font-semibold text-ink-soft hover:text-ink">Other tasks & issues for this project ({p.workItems.filter((w) => w.status.category !== "DONE").length} open)</summary>
                   <ul className="divide-y divide-line/70 px-5 pb-3 md:pl-10">
-                    {p.workItems.map((w) => <WorkRow key={w.id} i={w} columns={colOpts} canMove={canMoveItem(user, w)} />)}
+                    {p.workItems.map((w) => <WorkRow key={w.id} i={w} columns={colOpts} canMove={canMoveItem(user, w)} fields={extras.fields} />)}
                   </ul>
                 </details>
               )}

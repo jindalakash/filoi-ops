@@ -11,7 +11,7 @@ import { createDeliverableTasks } from "@/lib/work";
 import { date } from "@/lib/format";
 import type { ActionState } from "@/components/client";
 
-const TYPE_LABEL: Record<string, string> = { DOCUMENT: "Document / report", SYSTEM: "System / software", REPORT: "Progress report", TRAINING: "Training / workshop", DATA: "Data / dataset", OTHER: "Other" };
+import { optionLabels } from "@/lib/custom";
 
 /** Everything the model needs about this deliverable, as plain text. */
 async function contextFor(deliverableId: string) {
@@ -24,6 +24,7 @@ async function contextFor(deliverableId: string) {
     },
   });
   const p = dl.project;
+  const TYPE_LABEL = await optionLabels("deliverableType");
   const [team, tpl, contract, similar] = await Promise.all([
     db.user.findMany({ where: { active: true }, select: { name: true, designation: true, role: true } }),
     getSetting("taskTemplates"),

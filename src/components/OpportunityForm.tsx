@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Field } from "./ui";
 import { ActionForm } from "./client";
+import { CustomFieldInputs } from "./CustomFieldInputs";
+import type { FieldDef, CustomValues } from "@/lib/custom";
+
 import { CurrencySelect, PersonSelect, FormFooter } from "./forms";
 import { saveOpportunity } from "@/app/actions/opportunities";
 import { inputDate, num } from "@/lib/format";
@@ -10,7 +13,7 @@ type Opt = { id: string; name: string };
 
 export type NewClientHint = { name: string; shortName?: string | null; country?: string | null };
 
-export function OpportunityForm({ o, clients, users, cancel, newClient, intakeId }: { o?: Partial<Opportunity>; clients: Opt[]; users: Opt[]; cancel: string; newClient?: NewClientHint; intakeId?: string }) {
+export function OpportunityForm({ o, clients, users, cancel, newClient, intakeId, fields = [] }: { o?: Partial<Opportunity>; clients: Opt[]; users: Opt[]; cancel: string; newClient?: NewClientHint; intakeId?: string; fields?: FieldDef[] }) {
   const dt = (d?: Date | null) => (d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
   return (
     <ActionForm action={saveOpportunity}>
@@ -68,6 +71,7 @@ export function OpportunityForm({ o, clients, users, cancel, newClient, intakeId
           </div>
         </section>
       </div>
+      <CustomFieldInputs fields={fields} values={o?.custom as CustomValues | undefined} users={users} className="mt-6" />
       <FormFooter label={o?.id ? "Save changes" : "Create proposal"} cancel={cancel} />
     </ActionForm>
   );

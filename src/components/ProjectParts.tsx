@@ -5,17 +5,18 @@ import { saveDeliverable } from "@/app/actions/projects";
 import { saveMilestone } from "@/app/actions/finance";
 import { inputDate, num } from "@/lib/format";
 import type { Deliverable, Milestone } from "@prisma/client";
+import { CustomFieldInputs } from "./CustomFieldInputs";
+import type { FieldDef, CustomValues } from "@/lib/custom";
 
-export const DL_TYPES = [["DOCUMENT", "Document / report"], ["SYSTEM", "System / software"], ["REPORT", "Progress report"], ["TRAINING", "Training / workshop"], ["DATA", "Data / dataset"], ["OTHER", "Other"]] as const;
 
-export function DeliverableForm({ projectId, d, users, withBilling, currency }: { projectId: string; d?: Deliverable; users: { id: string; name: string }[]; withBilling?: boolean; currency: string }) {
+export function DeliverableForm({ projectId, d, users, withBilling, currency, types, fields = [] }: { projectId: string; d?: Deliverable; users: { id: string; name: string }[]; withBilling?: boolean; currency: string; types: { value: string; label: string }[]; fields?: FieldDef[] }) {
   return (
     <ActionForm action={saveDeliverable} resetOnOk={!d} className="rounded-xl border border-line bg-mist/50 p-4">
       <input type="hidden" name="projectId" value={projectId} />
       {d && <input type="hidden" name="id" value={d.id} />}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Deliverable *" className="sm:col-span-2"><input name="title" required defaultValue={d?.title} className="input" placeholder="Inception report" /></Field>
-        <Field label="Type"><select name="type" defaultValue={d?.type ?? "DOCUMENT"} className="input">{DL_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
+        <Field label="Type"><select name="type" defaultValue={d?.type ?? types[0]?.value} className="input">{types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}{d && !types.some((t) => t.value === d.type) && <option value={d.type}>{d.type} (retired)</option>}</select></Field>
         <Field label="Due date"><input type="date" name="dueDate" defaultValue={inputDate(d?.dueDate)} className="input" /></Field>
         <Field label="Description / acceptance criteria" className="sm:col-span-2"><textarea name="description" rows={2} defaultValue={d?.description ?? ""} className="input" /></Field>
         <Field label="Owner"><PersonSelect name="ownerId" users={users} value={d?.ownerId} /></Field>
@@ -28,6 +29,7 @@ export function DeliverableForm({ projectId, d, users, withBilling, currency }: 
             <Field label="Expected invoice date" hint="Defaults to due date"><input type="date" name="billDate" className="input" /></Field>
           </>
         )}
+        <CustomFieldInputs fields={fields} values={d?.custom as CustomValues | undefined} users={users} />
       </div>
       <div className="mt-3 flex justify-end"><SubmitButton className="btn-dark btn-sm">{d ? "Save deliverable" : "Add deliverable"}</SubmitButton></div>
     </ActionForm>

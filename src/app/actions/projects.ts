@@ -9,8 +9,10 @@ import { nextProjectCode } from "@/lib/codes";
 import { logActivity } from "@/lib/activity";
 import { getSetting } from "@/lib/settings";
 import { applyTemplateTo } from "@/lib/work";
+import { readCustom } from "@/lib/custom";
+import { FormError } from "@/lib/form";
 import type { ActionState } from "@/components/client";
-import type { DeliverableStatus, DeliverableType, ProjectStatus } from "@prisma/client";
+import type { DeliverableStatus, ProjectStatus } from "@prisma/client";
 
 export async function saveProject(_: ActionState, fd: FormData): Promise<ActionState> {
   const user = await requireUser("projects");
@@ -31,7 +33,9 @@ export async function saveProject(_: ActionState, fd: FormData): Promise<ActionS
       alertEmails: str(fd, "alertEmails"),
       reminderDays: str(fd, "reminderDays") || "5,2,0",
     };
-    const p = id ? await db.project.update({ where: { id }, data: d }) : await db.project.create({ data: { ...d, code: await nextProjectCode() } });
+    const custom = await readCustom(fd, "PROJECT", id ? (await db.project.findUnique({ where: { id }, select: { custom: true } }))?.custom : undefined);
+    const dd = { ...d, ...(custom ? { custom: custom as object } : {}) };
+    const p = id ? await db.project.update({ where: { id }, data: dd }) : await db.project.create({ data: { ...dd, code: await nextProjectCode() } });
     await logActivity(user.id, id ? "update" : "create", "project", p.id, `${id ? "Updated" : "Created"} project ${p.code}`);
     revalidatePath("/projects");
     redirect(`/projects/${p.id}`);
@@ -59,16 +63,21 @@ export async function saveDeliverable(_: ActionState, fd: FormData): Promise<Act
     const d = {
       title: req(fd, "title", "Title"),
       description: str(fd, "description"),
-      type: (str(fd, "type") || "DOCUMENT") as DeliverableType,
+      type: str(fd, "type") || "DOCUMENT",
       dueDate: dateOf(fd, "dueDate"),
       ownerId: str(fd, "ownerId"),
       alertEmails: str(fd, "alertEmails"),
     };
+    const known = await db.optionItem.findFirst({ where: { list: "deliverableType", value: d.type } });
+    const prev = id ? await db.deliverable.findUnique({ where: { id }, select: { type: true, custom: true } }) : null;
+    if (!known && prev?.type !== d.type) throw new FormError("Unknown deliverable type — pick one from the list.");
+    const custom = await readCustom(fd, "DELIVERABLE", prev?.custom);
+    const dd = { ...d, ...(custom ? { custom: custom as object } : {}) };
     let dl;
-    if (id) dl = await db.deliverable.update({ where: { id }, data: d });
+    if (id) dl = await db.deliverable.update({ where: { id }, data: dd });
     else {
       const seq = (await db.deliverable.count({ where: { projectId } })) + 1;
-      dl = await db.deliverable.create({ data: { ...d, projectId, seq } });
+      dl = await db.deliverable.create({ data: { ...dd, projectId, seq } });
       if ((await getSetting("taskTemplates")).auto) await applyTemplateTo(dl.id, user.id);
       // optional billing milestone created together with the deliverable
       const amount = numOf(fd, "billAmount");
