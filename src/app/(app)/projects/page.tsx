@@ -6,6 +6,7 @@ import { can } from "@/lib/permissions";
 import { PageHeader, Card, Empty, Progress } from "@/components/ui";
 import { StatusBadge, PROJECT_STATUS, DueDate } from "@/components/badges";
 import { Amt } from "@/components/Money";
+import { deliverableProgress } from "@/components/DeliverableProgress";
 import { num } from "@/lib/format";
 import type { ProjectStatus } from "@prisma/client";
 
@@ -22,7 +23,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     },
     include: {
       client: true, manager: true,
-      deliverables: { select: { status: true, dueDate: true } },
+      deliverables: { select: { title: true, status: true, dueDate: true } },
       invoices: { where: { status: { not: "CANCELLED" } }, select: { subtotal: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -38,8 +39,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       {projects.length === 0 ? <Card><Empty title="No projects">When a proposal is won, use “Create project” — or add one directly.</Empty></Card> : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => {
-            const total = p.deliverables.length;
-            const done = p.deliverables.filter((d) => d.status === "ACCEPTED").length;
+            const dp = deliverableProgress(p.deliverables);
             const next = p.deliverables.filter((d) => d.status !== "ACCEPTED" && d.dueDate).sort((a, b) => +a.dueDate! - +b.dueDate!)[0];
             const invoiced = p.invoices.reduce((a, i) => a + num(i.subtotal), 0);
             return (
@@ -50,8 +50,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 </div>
                 <div className="mt-2 line-clamp-2 font-display text-[15px] font-semibold group-hover:text-plum">{p.title}</div>
                 <div className="mt-4 space-y-1.5">
-                  <div className="flex justify-between text-xs text-ink-soft"><span>Deliverables</span><span>{done}/{total} accepted</span></div>
-                  <Progress value={total ? (done / total) * 100 : 0} />
+                  <div className="flex justify-between text-xs text-ink-soft"><span>Deliverables <b className="text-ink">{dp.pct}%</b></span><span>{dp.done}/{dp.total} accepted{dp.left > 0 && ` · ${dp.left} left`}{dp.overdue > 0 && <b className="text-red-700"> · {dp.overdue} overdue</b>}</span></div>
+                  <Progress value={dp.pct} />
                 </div>
                 {fin && num(p.contractValue) > 0 && (
                   <div className="mt-3 space-y-1.5">

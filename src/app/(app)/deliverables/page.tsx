@@ -8,6 +8,7 @@ import { StatusBadge, DL_STATUS, DueDate } from "@/components/badges";
 import { AutoSelect } from "@/components/client";
 import { setDeliverableStatus } from "@/app/actions/projects";
 import type { Prisma } from "@prisma/client";
+import { ProgressLine } from "@/components/DeliverableProgress";
 
 export const metadata = { title: "Deliverables" };
 
@@ -24,12 +25,28 @@ export default async function DeliverablesPage({ searchParams }: { searchParams:
       : v === "open" ? { status: { not: "ACCEPTED" } } : {}),
   };
   const rows = await db.deliverable.findMany({ where, include: { project: { include: { client: true } }, owner: true }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }] });
+  const projects = await db.project.findMany({
+    where: { status: "ACTIVE", ...(mine ? { OR: [{ managerId: user.id }, { deliverables: { some: { ownerId: user.id } } }] } : {}) },
+    select: { id: true, code: true, title: true, endDate: true, client: { select: { name: true, shortName: true } }, deliverables: { select: { title: true, status: true, dueDate: true } } },
+    orderBy: { endDate: { sort: "asc", nulls: "last" } },
+  });
+  const allRows = projects.flatMap((p) => p.deliverables);
   const views = [["upcoming", "Next 30 days"], ["overdue", "Overdue"], ["open", "All open"], ["all", "Everything"]];
   const edit = can(user.role, "projects");
   const q = (k: string, val?: string) => `/deliverables?v=${k}${val ? "&mine=1" : ""}`;
   return (
     <>
       <PageHeader title="Deliverables" subtitle="Every output across active projects, by due date." />
+      {projects.length > 0 && (
+        <Card title="Progress" className="mb-5" actions={<span className="text-xs text-ink-soft">{projects.length} active project{projects.length === 1 ? "" : "s"}</span>}>
+          <div className="space-y-4">
+            {projects.length > 1 && <div className="border-b border-line pb-4"><ProgressLine rows={allRows} label="All active projects" sub={`${allRows.length} deliverables`} big /></div>}
+            {projects.map((p) => (
+              <ProgressLine key={p.id} rows={p.deliverables} label={p.code} href={`/projects/${p.id}?tab=deliverables`} sub={`${p.client.shortName || p.client.name} · ${p.title}`} big={projects.length === 1} />
+            ))}
+          </div>
+        </Card>
+      )}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {views.map(([k, l]) => <Link key={k} href={q(k, mine)} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold", v === k ? "border-navy bg-navy text-white" : "border-line bg-surface text-ink-soft hover:text-ink")}>{l}</Link>)}
         <Link href={q(v, mine ? undefined : "1")} className={clsx("ml-auto rounded-full border px-3 py-1.5 text-sm font-semibold", mine ? "border-plum bg-plum text-white" : "border-line bg-surface text-ink-soft")}>{mine ? "✓ " : ""}Only mine</Link>

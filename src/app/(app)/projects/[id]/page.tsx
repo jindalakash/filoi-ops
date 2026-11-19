@@ -9,6 +9,7 @@ import { AutoSelect, ConfirmAction, Disclosure } from "@/components/client";
 import { Documents } from "@/components/Documents";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { DeliverableForm, MilestoneForm, DL_TYPES } from "@/components/ProjectParts";
+import { ProgressLine, deliverableProgress } from "@/components/DeliverableProgress";
 import { setDeliverableStatus, deleteDeliverable, deleteProject } from "@/app/actions/projects";
 import { deleteMilestone } from "@/app/actions/finance";
 import { Amt } from "@/components/Money";
@@ -57,6 +58,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const invoicedGross = live.reduce((a, i) => a + num(i.total), 0);
   const scheduled = p.milestones.reduce((a, m) => a + num(m.amount), 0);
   const dlDone = p.deliverables.filter((d) => d.status === "ACCEPTED").length;
+  const dlProg = deliverableProgress(p.deliverables);
   const typeLabel = Object.fromEntries(DL_TYPES);
 
   const tabs = [
@@ -93,7 +95,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
       {sp.created && <div className="mb-5"><Notice tone="ok">Project created from the proposal. Next: upload the contract / PO in <b>Contract & files</b>, then add deliverables and billing milestones.</Notice></div>}
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Deliverables" value={`${dlDone}/${p.deliverables.length}`} hint="accepted" tone="plum" />
+        <Stat label="Deliverables progress" value={`${dlProg.pct}%`} hint={<>{dlDone}/{p.deliverables.length} accepted{dlProg.left > 0 && ` · ${dlProg.left} left`}{dlProg.overdue > 0 && <b className="text-red-700"> · {dlProg.overdue} overdue</b>}</>} tone="plum" href="?tab=deliverables" />
         <Stat label="Ends" value={<span className="text-xl">{date(p.endDate)}</span>} hint={p.startDate ? `Started ${date(p.startDate)}` : undefined} tone="ink" />
         {fin ? <>
           <Stat label="Contract value" value={<Amt v={cv} c={p.currency} compact />} hint={<><Amt v={cv - invoiced} c={p.currency} compact /> yet to invoice</>} tone="sky" />
@@ -113,6 +115,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
               <DeliverableForm projectId={id} users={users} withBilling={finEdit} currency={p.currency} />
             </Disclosure>
           )}
+          {p.deliverables.length > 0 && <Card><ProgressLine rows={p.deliverables} big /></Card>}
           <Card pad={false}>
             {p.deliverables.length === 0 ? <Empty title="No deliverables yet">Add each output from the contract — reports, systems, trainings — with its due date.{ready && <> Or let AI read the contract in <a className="link" href="?tab=documents">Contract &amp; files</a>.</>}</Empty> : (
               <ul className="divide-y divide-line">
