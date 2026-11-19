@@ -3,11 +3,11 @@ import { getSetting, type AiSettings } from "../settings";
 import { decrypt } from "../crypto";
 import { modelMatchesProvider } from "./models";
 import { documentText, isPdf, type SourceDoc } from "./text";
-import { TENDER_SCHEMA, CONTRACT_SCHEMA, CV_SCHEMA, type TenderExtraction, type ContractExtraction, type CvExtraction } from "./schemas";
+import { TENDER_SCHEMA, CONTRACT_SCHEMA, CV_SCHEMA, FINANCIAL_SCHEMA, type TenderExtraction, type ContractExtraction, type CvExtraction, type FinancialDraft } from "./schemas";
 
 export class AiError extends Error {}
 
-type Kind = "TENDER" | "CONTRACT" | "CV";
+type Kind = "TENDER" | "CONTRACT" | "CV" | "FINANCIAL";
 export type RunResult<T> = { data: T; provider: string; model: string; inputTokens?: number; outputTokens?: number };
 
 const MAX_PDF_BYTES = 24 * 1024 * 1024; // Claude request limit is 32 MB (base64 adds ~33%)
@@ -22,12 +22,19 @@ function instructions(kind: Kind) {
   const common = `You extract structured data for Filoi Private Limited, an Indian public-health and digital-health consulting firm that bids for UN agency, multilateral and government assignments.
 Today's date is ${today}.
 Rules:
-- Use only what the documents say. If a value is not stated, return null (or an empty list). Never invent dates, amounts or names.
+- Use only what the documents say. If a text value is not stated, return an empty string ""; if a number is not stated, return null; if a list has nothing, return []. Never invent dates, amounts or names.
 - Dates: ISO 8601. If a date is relative ("30 days after signature") and the anchor date is known, compute it; otherwise leave the date null and keep the wording in the timing field.
 - Amounts: plain numbers without currency symbols or thousands separators.
 - Evidence: give a short verbatim quote (under 30 words) for each key value you filled — title, client, deadline(s), budget/value, evaluation, and any payment terms — with the page number when you can tell it.
 - If several documents are given (e.g. TOR plus annexes), combine them.
 - File names are not data: never use a file name as a value (e.g. for source or reference).`;
+  if (kind === "FINANCIAL")
+    return `${common}
+Task: prepare the financial proposal (cost breakdown) for this bid.
+- Fee lines: one per proposed team member, using their daily rate converted to the proposal currency when given, and person-days consistent with the TOR, the duration and the work plan.
+- Add travel, per diem / DSA and other direct costs only where the TOR implies them (missions, workshops, printing, translation), with realistic quantities.
+- Follow the structure of the past financial proposals provided, if any. Where a number is your estimate, say so in "basis". Stay within any budget ceiling stated in the TOR.
+- Do not add taxes; they are handled separately.`;
   if (kind === "CV")
     return `${common}
 Task: read this CV / résumé and capture the expert's profile for a consulting firm's CV bank. Summarise in the third person, factual, no embellishment.`;
@@ -64,10 +71,19 @@ async function textBundle(docs: SourceDoc[]) {
   return all;
 }
 
+/** Empty strings → null, blank list items dropped, unknown page 0 → null (schemas use "" instead of null to stay within Claude's limits). */
+export function normalise(v: unknown, key = ""): unknown {
+  if (typeof v === "string") { const t = v.trim(); return t === "" ? null : t; }
+  if (Array.isArray(v)) return v.map((x) => normalise(x)).filter((x) => x !== null && x !== "");
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, normalise(x, k)]));
+  if (key === "page" && v === 0) return null;
+  return v;
+}
+
 function parseJson<T>(text: string): T {
   const clean = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   try {
-    return JSON.parse(clean) as T;
+    return normalise(JSON.parse(clean)) as T;
   } catch {
     throw new AiError("The AI response could not be read. Please try again.");
   }
@@ -88,7 +104,7 @@ async function runClaude<T>(cfg: Awaited<ReturnType<typeof config>>, kind: Kind,
       content.push({ type: "document", title: d.fileName, source: { type: "text", media_type: "text/plain", data: t } });
     }
   }
-  content.push({ type: "text", text: kind === "TENDER" ? "Extract the tender details." : kind === "CV" ? "Extract the CV details." : "Extract the contract details." });
+  content.push({ type: "text", text: kind === "TENDER" ? "Extract the tender details." : kind === "CV" ? "Extract the CV details." : kind === "FINANCIAL" ? "Prepare the financial proposal." : "Extract the contract details." });
 
   const stream = client.beta.messages.stream({
     model: cfg.model,
@@ -105,7 +121,10 @@ async function runClaude<T>(cfg: Awaited<ReturnType<typeof config>>, kind: Kind,
   } catch (e) {
     if (e instanceof Anthropic.AuthenticationError) throw new AiError("Claude rejected the API key. Check it in Settings → AI.");
     if (e instanceof Anthropic.RateLimitError) throw new AiError("Claude rate limit reached. Wait a minute and try again.");
-    if (e instanceof Anthropic.BadRequestError) throw new AiError(`Claude could not process this request: ${e.message}`);
+    if (e instanceof Anthropic.BadRequestError) {
+      const detail = (e.error as { error?: { message?: string } } | undefined)?.error?.message ?? e.message;
+      throw new AiError(`Claude could not process this document: ${detail.slice(0, 220)}`);
+    }
     if (e instanceof Anthropic.APIError) throw new AiError(`Claude API error ${e.status ?? ""}: ${e.message}`);
     throw e;
   }
@@ -179,6 +198,9 @@ async function run<T>(kind: Kind, docs: SourceDoc[], schema: object): Promise<Ru
 export const extractTender = (docs: SourceDoc[]) => run<TenderExtraction>("TENDER", docs, TENDER_SCHEMA);
 export const extractContract = (docs: SourceDoc[]) => run<ContractExtraction>("CONTRACT", docs, CONTRACT_SCHEMA);
 export const extractCv = (docs: SourceDoc[]) => run<CvExtraction>("CV", docs, CV_SCHEMA);
+/** Cost breakdown from a text context bundle (TOR, team with rates, past financial proposals). */
+export const draftFinancialLines = (context: string) =>
+  run<FinancialDraft>("FINANCIAL", [{ fileName: "bid-context.txt", mimeType: "text/plain", buffer: Buffer.from(context, "utf8") }], FINANCIAL_SCHEMA);
 
 // ── Free-text drafting (proposal sections) ──
 export type DraftResult = { text: string; provider: string; model: string; cacheRead?: number; cacheWrite?: number; inputTokens?: number };

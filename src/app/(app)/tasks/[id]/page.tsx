@@ -11,6 +11,9 @@ import { Documents } from "@/components/Documents";
 import { Avatar, TaskForm } from "@/components/TaskParts";
 import { moveTask, commentTask, deleteTask } from "@/app/actions/tasks";
 import { date } from "@/lib/format";
+import { TaskWriteArea } from "@/components/TaskWriteArea";
+import { proposalAccess } from "@/lib/permissions-proposal";
+import { aiReady } from "@/lib/ai/run";
 
 const EVENT: Record<string, string> = {
   ASSIGNED: "assigned the task", STARTED: "started working", SUBMITTED: "marked it done and sent it for review",
@@ -33,7 +36,12 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
   const manager = canManageTasks(user);
   const mine = isAssignee(user, t);
   const reviewing = isReviewer(user, t);
-  const users = await db.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  const [users, access, ai] = await Promise.all([
+    db.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    proposalAccess(user, t.opportunityId),
+    aiReady(),
+  ]);
+  const writable = (mine || manager) && t.status !== "APPROVED" && t.status !== "IN_REVIEW";
   const o = t.opportunity;
   const canWork = (mine || manager) && ["TODO", "IN_PROGRESS", "CHANGES_REQUESTED"].includes(t.status);
   const canReview = (reviewing || manager) && t.status === "IN_REVIEW";
@@ -68,8 +76,10 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
             {t.description && <div className="mt-5"><div className="label">Instructions</div><p className="whitespace-pre-line text-sm">{t.description}</p></div>}
           </Card>
 
-          <Documents docs={t.documents} link={{ opportunityId: o.id, proposalTaskId: t.id }} path={`/tasks/${t.id}`} defaultCategory="TECHNICAL_PROPOSAL"
-            categories={["TECHNICAL_PROPOSAL", "FINANCIAL_PROPOSAL", "CORRESPONDENCE", "OTHER"]} title="Drafts & files for this part" />
+          <TaskWriteArea t={t} canEdit={writable && access.technical} canEditFinancial={writable && access.financial} ai={ai} />
+
+          <Documents docs={t.documents} link={{ opportunityId: o.id, proposalTaskId: t.id }} path={`/tasks/${t.id}`} defaultCategory={t.scope === "FINANCIAL" ? "FINANCIAL_PROPOSAL" : "TECHNICAL_PROPOSAL"}
+            categories={["TECHNICAL_PROPOSAL", "FINANCIAL_PROPOSAL", "CORRESPONDENCE", "OTHER"]} title={t.scope === "OTHER" ? "Documents for this part" : "Or upload a finished document"} />
 
           <Card title="Discussion">
             <ol className="space-y-4">
@@ -111,7 +121,7 @@ export default async function TaskPage({ params }: PageProps<"/tasks/[id]">) {
                   <Field label="Send for review to"><PersonSelect name="reviewerId" users={users.filter((u) => u.id !== t.assigneeId)} value={t.reviewerId} placeholder="— Choose reviewer —" /></Field>
                   <Field label="Note for the reviewer"><textarea name="note" rows={3} className="input" placeholder="What's done, where the files are, open questions…" /></Field>
                   <SubmitButton className="btn-primary w-full">✓ Mark done & send for review</SubmitButton>
-                  <p className="text-xs text-ink-soft">Upload your draft under “Drafts & files” first.</p>
+                  <p className="text-xs text-ink-soft">{t.scope === "OTHER" ? "Upload the documents first." : "Write it above (or upload a finished document), then send it for review."}</p>
                 </ActionForm>
               </div>
             )}

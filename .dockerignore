@@ -6,3 +6,5 @@ templates-bank
 .git
 .claude
 backups
+
+.next.nosync

@@ -10,8 +10,8 @@ function greeting() {
   return h < 5 ? "Working late" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const { next } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; expired?: string }> }) {
+  const { next, expired } = await searchParams;
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.15fr_1fr]">
       <LoginShowcase />
@@ -25,6 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <p className="anim-fade-up text-sm font-semibold text-plum" style={{ animationDelay: ".05s" }}>{greeting()} 👋</p>
             <h2 className="anim-fade-up mt-1 font-display text-3xl font-semibold tracking-tight text-ink" style={{ animationDelay: ".1s" }}>Sign in to Filoi Ops</h2>
             <p className="anim-fade-up mt-2 text-sm text-ink-soft" style={{ animationDelay: ".15s" }}>Proposals, projects and billing for the Filoi team.</p>
+            {expired && <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">Your session ended (your account may have been changed). Please sign in again.</p>}
             <div className="anim-fade-up mt-8" style={{ animationDelay: ".22s" }}>
               <LoginForm next={next ?? "/"} />
             </div>

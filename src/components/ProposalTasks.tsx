@@ -24,7 +24,7 @@ export async function ProposalTasks({ opportunityId, manage, ownerId, deadline, 
       )}
       {manage && (
         <div className="flex flex-wrap items-start gap-2 border-t border-line p-4">
-          <div className="w-full"><Disclosure label="+ Assign a part" className="btn-primary btn-sm"><TaskForm opportunityId={opportunityId} users={users} defaultReviewer={ownerId} defaultDue={defaultDue} /></Disclosure></div>
+          <div className="w-full"><Disclosure label="+ Assign a part" className="btn-primary btn-sm"><TaskForm opportunityId={opportunityId} users={users} defaultReviewer={ownerId} defaultDue={defaultDue} existing={tasks.map((t) => t.title)} /></Disclosure></div>
           {hasChecklist && <ConfirmAction action={tasksFromChecklist} fields={{ opportunityId }} label="Create tasks from the submission checklist" confirm="Create one task for each item in “Documents to submit”?" className="btn-ghost btn-sm" />}
         </div>
       )}

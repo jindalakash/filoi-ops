@@ -14,6 +14,7 @@ import { Amt } from "@/components/Money";
 import { addStandardSections, addSection, addTeamMember, updateTeamMember, removeTeamMember, toggleReference } from "@/app/actions/proposal";
 import { num } from "@/lib/format";
 import { FileDown } from "lucide-react";
+import { DraftAllForm, DraftFinancialForm } from "@/components/AiProposalForms";
 
 export default async function Workspace({ params, searchParams }: PageProps<"/opportunities/[id]/workspace">) {
   const user = await requireUser();
@@ -74,6 +75,7 @@ export default async function Workspace({ params, searchParams }: PageProps<"/op
       {tab === "sections" && (
         <div className="space-y-5">
           {!ai && access.technical && <Notice>Turn on AI in Settings → AI to draft sections from the TOR and your library.</Notice>}
+          {ai && access.technical && <DraftAllForm opportunityId={id} sectionCount={o.sections.length} emptyCount={o.sections.filter((s) => !s.content.trim()).length} />}
           {o.sections.length === 0 ? (
             <Card><Empty title="No sections yet">Start with the standard structure most UN / development-bank evaluators expect, or add your own.</Empty></Card>
           ) : o.sections.map((s, i) => <SectionEditor key={s.id} s={s} index={i} editable={access.technical} ai={ai} />)}
@@ -168,9 +170,11 @@ export default async function Workspace({ params, searchParams }: PageProps<"/op
         </Card>
       )}
 
+      {tab === "financial" && ai && access.financial && <div className="mb-4"><DraftFinancialForm opportunityId={id} hasLines={o.finLines.length > 0} /></div>}
       {tab === "financial" && (
         <Card>
           <FinancialEditor
+            key={o.finLines.map((l) => `${l.description}:${num(l.quantity)}:${num(l.rate)}`).join("|")}
             opportunityId={id}
             editable={access.financial}
             currency={o.currency}

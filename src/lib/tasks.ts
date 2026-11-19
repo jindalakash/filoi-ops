@@ -48,3 +48,20 @@ export async function notifyTask(taskId: string, event: Event, actorId: string, 
     console.error("[tasks] notify failed", e);
   }
 }
+
+/** One email for several parts assigned to the same person at once. */
+export async function notifyAssignedMany(taskIds: string[], actorId: string) {
+  if (taskIds.length === 1) return notifyTask(taskIds[0], "ASSIGNED", actorId);
+  try {
+    const tasks = await db.proposalTask.findMany({ where: { id: { in: taskIds } }, include: { assignee: true, opportunity: { include: { client: true } } }, orderBy: { seq: "asc" } });
+    const first = tasks[0];
+    if (!first?.assignee?.email || first.assigneeId === actorId) return;
+    const o = first.opportunity;
+    const list = tasks.map((t) => `<li><a href="${appUrl()}/tasks/${t.id}">${t.title.replace(/</g, "&lt;")}</a>${t.dueDate ? ` — due ${date(t.dueDate)}` : ""}</li>`).join("");
+    const subject = `[${o.code}] You've been assigned ${tasks.length} parts`;
+    const body = `<p style="color:#4a5878;font-size:13px">${o.code} · ${o.title} (${o.client.shortName || o.client.name})</p><p>You have been assigned:</p><ul>${list}</ul>${first.description ? `<p>${first.description.replace(/</g, "&lt;")}</p>` : ""}`;
+    await sendOnce(`tasks:${taskIds.join(",").slice(0, 120)}:ASSIGNED:${Date.now()}`, "task", [first.assignee.email], subject, emailShell(`${tasks.length} parts assigned to you`, body, { href: `${appUrl()}/tasks`, label: "Open my tasks" }));
+  } catch (e) {
+    console.error("[tasks] notify failed", e);
+  }
+}

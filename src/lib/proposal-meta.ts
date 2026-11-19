@@ -12,3 +12,28 @@ export const STANDARD_SECTIONS: { title: string; guidance: string }[] = [
 ];
 
 export const COST_LABEL = { FEES: "Professional fees", TRAVEL: "Travel", PER_DIEM: "Per diem / DSA", OTHER: "Other direct costs" } as const;
+
+export const WHOLE_TECHNICAL = "Complete technical proposal";
+export const WHOLE_FINANCIAL = "Complete financial proposal";
+export const TEAM_PART = "Team & CVs";
+export const SUPPORT_PARTS = ["Compliance & declaration forms", "Company documents (registration, audited accounts)", "Final review & formatting"];
+
+/** Parts offered when assigning work, grouped for the picker. */
+export const PART_GROUPS: { label: string; items: string[] }[] = [
+  { label: "Whole proposal", items: [WHOLE_TECHNICAL, WHOLE_FINANCIAL] },
+  { label: "Technical sections", items: [...STANDARD_SECTIONS.map((s) => s.title), TEAM_PART] },
+  { label: "Supporting documents", items: SUPPORT_PARTS },
+];
+export const SECTION_SUGGESTIONS: string[] = PART_GROUPS.flatMap((g) => g.items);
+
+export type TaskScope = "SECTION" | "TECHNICAL" | "FINANCIAL" | "TEAM" | "OTHER";
+
+/** What a part means: a section to write, the whole technical/financial proposal, the team, or supporting uploads. */
+export function scopeForPart(title: string): TaskScope {
+  const t = title.trim().toLowerCase();
+  if (t === WHOLE_TECHNICAL.toLowerCase()) return "TECHNICAL";
+  if (t === WHOLE_FINANCIAL.toLowerCase() || /financial proposal|budget/.test(t)) return "FINANCIAL";
+  if (t === TEAM_PART.toLowerCase() || /\bcvs?\b|team composition/.test(t)) return "TEAM";
+  if (SUPPORT_PARTS.some((p) => p.toLowerCase() === t) || /compliance|declaration|company document|registration|final review|formatting/.test(t)) return "OTHER";
+  return "SECTION"; // standard or custom technical section
+}

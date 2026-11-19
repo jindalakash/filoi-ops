@@ -7,11 +7,17 @@ import { guard, req, str, numOf, FormError } from "@/lib/form";
 import { logActivity } from "@/lib/activity";
 import { STANDARD_SECTIONS } from "@/lib/proposal-meta";
 import { proposalContext, DRAFT_SYSTEM } from "@/lib/proposal-context";
-import { draftText, AiError } from "@/lib/ai/run";
+import { draftText, draftFinancialLines, AiError } from "@/lib/ai/run";
+import { getSetting } from "@/lib/settings";
+import { toINR } from "@/lib/fx";
+import { num } from "@/lib/format";
 import type { ActionState } from "@/components/client";
 import type { CostCategory } from "@prisma/client";
 
-const ws = (id: string) => revalidatePath(`/opportunities/${id}/workspace`);
+const ws = (id: string) => {
+  revalidatePath(`/opportunities/${id}/workspace`);
+  revalidatePath("/tasks", "layout"); // task pages embed the same sections / financials
+};
 
 async function gate(opportunityId: string, need: "technical" | "financial" | "manage" = "technical") {
   const user = await requireUser();
@@ -80,33 +86,105 @@ export async function deleteSection(_: ActionState, fd: FormData): Promise<Actio
   });
 }
 
+/** Draft one section; shared by "Draft with AI" and "Draft the whole technical proposal". */
+async function draftOne(sectionId: string, userId: string, extra?: string | null) {
+  const s = await db.proposalSection.findUniqueOrThrow({ where: { id: sectionId } });
+  const { stable, volatile } = await proposalContext(s.opportunityId, s.id);
+  const request = [
+    volatile,
+    `Write the proposal section titled "${s.title}".`,
+    s.guidance && `It should cover: ${s.guidance}`,
+    s.content.trim() && `Improve and complete this existing draft rather than starting over:\n"""\n${s.content.slice(0, 20_000)}\n"""`,
+    extra && `Additional instructions from the bid team: ${extra}`,
+    "Aim for 400–900 words unless the instructions say otherwise.",
+  ].filter(Boolean).join("\n\n");
+  const r = await draftText(DRAFT_SYSTEM, stable, request);
+  if (!r.text) throw new AiError("The AI returned an empty draft. Try again.");
+  await db.proposalSection.update({ where: { id: s.id }, data: { content: r.text, aiModel: r.model, updatedById: userId } });
+  const cache = r.cacheRead ? ` · ${Math.round(r.cacheRead / 1000)}k tokens from cache` : r.cacheWrite ? ` · cached ${Math.round(r.cacheWrite / 1000)}k tokens for the next sections` : "";
+  await logActivity(userId, "ai", "opportunity", s.opportunityId, `AI drafted “${s.title}” (${r.model}${cache})`);
+  return { s, r };
+}
+
+const aiFail = (e: unknown) => {
+  if (e instanceof AiError || e instanceof FormError) return { error: e.message };
+  console.error("[ai] draft", e);
+  return { error: "The AI service failed. Please try again." };
+};
+
 /** AI writes (or rewrites) a section using the TOR, team, references, company profile and past proposals. */
 export async function draftSection(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const s = await db.proposalSection.findUniqueOrThrow({ where: { id: req(fd, "id") } });
     const user = await gate(s.opportunityId);
-    const extra = str(fd, "instructions");
-    const { stable, volatile } = await proposalContext(s.opportunityId, s.id);
-    const request = [
-      volatile,
-      `Write the proposal section titled "${s.title}".`,
-      s.guidance && `It should cover: ${s.guidance}`,
-      s.content.trim() && `Improve and complete this existing draft rather than starting over:\n"""\n${s.content.slice(0, 20_000)}\n"""`,
-      extra && `Additional instructions from the bid team: ${extra}`,
-      "Aim for 400–900 words unless the instructions say otherwise.",
-    ].filter(Boolean).join("\n\n");
-    const r = await draftText(DRAFT_SYSTEM, stable, request);
-    if (!r.text) return { error: "The AI returned an empty draft. Try again." };
-    await db.proposalSection.update({ where: { id: s.id }, data: { content: r.text, aiModel: r.model, updatedById: user.id } });
-    const cache = r.cacheRead ? ` · ${Math.round(r.cacheRead / 1000)}k tokens from cache` : r.cacheWrite ? ` · cached ${Math.round(r.cacheWrite / 1000)}k tokens for the next sections` : "";
-    await logActivity(user.id, "ai", "opportunity", s.opportunityId, `AI drafted “${s.title}” (${r.model}${cache})`);
+    const { r } = await draftOne(s.id, user.id, str(fd, "instructions"));
     ws(s.opportunityId);
     return { ok: `Drafted with ${r.model}${r.cacheRead ? " (reused cached context — cheaper)" : ""}. Review and edit before using.` };
-  } catch (e) {
-    if (e instanceof AiError || e instanceof FormError) return { error: e.message };
-    console.error("[ai] draft", e);
-    return { error: "The AI service failed. Please try again." };
-  }
+  } catch (e) { return aiFail(e); }
+}
+
+/** Draft every empty section in order (adds the standard structure first if there are no sections). */
+export async function draftAllSections(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const opportunityId = req(fd, "opportunityId");
+    const user = await gate(opportunityId);
+    if ((await db.proposalSection.count({ where: { opportunityId } })) === 0) {
+      let seq = 0;
+      for (const st of STANDARD_SECTIONS) await db.proposalSection.create({ data: { opportunityId, title: st.title, guidance: st.guidance, seq: seq++ } });
+    }
+    const rewrite = fd.get("rewrite") === "on";
+    const sections = await db.proposalSection.findMany({ where: { opportunityId }, orderBy: [{ seq: "asc" }, { createdAt: "asc" }] });
+    const todo = sections.filter((x) => rewrite || !x.content.trim());
+    if (!todo.length) return { ok: "Every section already has text. Tick “also improve sections that have text” to revise them." };
+    const extra = str(fd, "instructions");
+    let done = 0;
+    for (const sec of todo) {
+      await draftOne(sec.id, user.id, extra);
+      done++;
+    }
+    ws(opportunityId);
+    return { ok: `Drafted ${done} section${done > 1 ? "s" : ""}. Review each one and edit before submitting.` };
+  } catch (e) { ws(String(fd.get("opportunityId") ?? "")); return aiFail(e); }
+}
+
+/** AI proposes the cost breakdown from the TOR, the team's rates and past financial proposals; you review and save. */
+export async function draftFinancial(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const opportunityId = req(fd, "opportunityId");
+    const user = await gate(opportunityId, "financial");
+    const [{ stable, opportunity: o }, team, fins, fx] = await Promise.all([
+      proposalContext(opportunityId),
+      db.proposalTeamMember.findMany({ where: { opportunityId }, include: { expert: true }, orderBy: { seq: "asc" } }),
+      db.libraryItem.findMany({ where: { kind: "FIN_TEMPLATE", textContent: { not: null } }, take: 3, orderBy: { createdAt: "desc" } }),
+      getSetting("fx"),
+    ]);
+    const cur = o.currency || "USD";
+    const rateIn = (v: unknown, from: string) => Math.round((toINR(v, from, fx) / (fx[cur as keyof typeof fx] ?? 1)) * 100) / 100;
+    const ctx = [
+      stable,
+      `=== FINANCIAL PROPOSAL BASICS ===\nCurrency: ${cur}\nDuration: ${o.durationMonths ?? "?"} months\n${o.estimatedValue ? `Current indicative value: ${cur} ${num(o.estimatedValue)}` : ""}`,
+      team.length ? `=== TEAM DAILY RATES (in ${cur}) ===\n${team.map((m) => `- ${m.expert.name} (${m.position}${m.isKey ? ", key expert" : ""}): ${m.expert.dailyRate ? `${cur} ${rateIn(m.expert.dailyRate, m.expert.rateCurrency)} / day` : "rate not set"}${m.inputDays ? `; planned ${num(m.inputDays)} days` : ""}`).join("\n")}` : "=== TEAM ===\n(No team selected yet — propose generic positions with estimated rates and say so.)",
+      fins.length ? `=== OUR PAST FINANCIAL PROPOSALS (follow their structure) ===\n${fins.map((f) => `--- ${f.title} ---\n${(f.textContent ?? "").slice(0, 15_000)}`).join("\n\n")}` : "",
+      str(fd, "instructions") ? `=== INSTRUCTIONS FROM THE BID TEAM ===\n${str(fd, "instructions")}` : "",
+    ].filter(Boolean).join("\n\n");
+    const r = await draftFinancialLines(ctx);
+    const lines = r.data.lines.filter((l) => l.description && l.quantity > 0);
+    if (!lines.length) return { error: "The AI did not return any cost lines. Add the team first, then try again." };
+    const byName = new Map(team.map((m) => [m.expert.name.toLowerCase(), m.expertId]));
+    await db.$transaction([
+      db.financialLine.deleteMany({ where: { opportunityId } }),
+      ...lines.map((l, i) => db.financialLine.create({ data: {
+        opportunityId, seq: i, category: l.category as CostCategory, unit: l.unit || "day", quantity: l.quantity, rate: l.rate || 0,
+        description: l.basis && /estimate/i.test(l.basis) ? `${l.description} (estimate)` : l.description,
+        expertId: l.expert_name ? byName.get(l.expert_name.toLowerCase()) ?? null : null,
+      } })),
+      db.opportunity.update({ where: { id: opportunityId }, data: { finNotes: r.data.notes, ...(o.finTaxRate == null ? { finTaxRate: 0 } : {}) } }),
+    ]);
+    await logActivity(user.id, "ai", "opportunity", opportunityId, `AI drafted the financial proposal (${lines.length} lines, ${r.model})`);
+    ws(opportunityId);
+    revalidatePath(`/opportunities/${opportunityId}`);
+    return { ok: `AI drafted ${lines.length} cost lines with ${r.model}. Check quantities and rates, then click “Save financial proposal”.` };
+  } catch (e) { return aiFail(e); }
 }
 
 // ── Team ──

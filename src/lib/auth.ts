@@ -22,7 +22,11 @@ export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>
 
 export async function requireUser(cap?: Capability) {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    // a valid cookie for a deleted/deactivated user would bounce between / and /login — clear it first
+    const hasCookie = !!(await cookies()).get(SESSION_COOKIE)?.value;
+    redirect(hasCookie ? "/api/auth/expired" : "/login");
+  }
   if (cap && !can(user.role, cap)) redirect("/?denied=1");
   return user;
 }

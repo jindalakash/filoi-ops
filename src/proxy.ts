@@ -10,7 +10,7 @@ export async function proxy(req: NextRequest) {
     if (req.nextUrl.pathname !== "/") url.searchParams.set("next", req.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
-  if (session && isLogin) return NextResponse.redirect(new URL("/", req.url));
+  if (session && isLogin && !req.nextUrl.searchParams.has("expired")) return NextResponse.redirect(new URL("/", req.url));
   return NextResponse.next();
 }
 

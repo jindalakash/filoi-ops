@@ -1,17 +1,18 @@
-// JSON Schemas for structured extraction. Every property is required and nullable
-// where the document may not state it, so the model never has to guess.
+// JSON Schemas for structured extraction. Every property is required so the model never skips one.
+// Claude's structured outputs allow at most 16 union-typed (nullable) parameters per schema, so text
+// fields use "" when not stated (normalised back to null in run.ts); only numbers stay nullable.
 
-const str = { type: ["string", "null"] };
+const str = { type: "string" };
 const num = { type: ["number", "null"] };
 const int = { type: ["integer", "null"] };
-const currency = { type: ["string", "null"], description: "ISO currency code, e.g. USD, EUR, INR" };
+const currency = { type: "string", description: "ISO currency code, e.g. USD, EUR, INR; \"\" if not stated" };
 
 const evidence = {
   type: "array",
   description: "Short verbatim quotes from the document backing the most important extracted values.",
   items: {
     type: "object",
-    properties: { field: { type: "string" }, quote: { type: "string" }, page: int },
+    properties: { field: { type: "string" }, quote: { type: "string" }, page: { type: "integer", description: "Page number, or 0 if unknown" } },
     required: ["field", "quote", "page"],
     additionalProperties: false,
   },
@@ -151,4 +152,37 @@ export const CV_SCHEMA = {
 export type CvExtraction = {
   name: string; title: string | null; email: string | null; phone: string | null; nationality: string | null; years_experience: number | null;
   expertise: string[]; languages: string[]; education: string | null; summary: string; key_projects: string[];
+};
+
+export const FINANCIAL_SCHEMA = {
+  type: "object",
+  properties: {
+    currency: { type: "string", description: "ISO code of the proposal currency" },
+    lines: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["FEES", "TRAVEL", "PER_DIEM", "OTHER"] },
+          description: { type: "string" },
+          expert_name: { type: "string", description: "Exact name from the proposed team for fee lines, else \"\"" },
+          unit: { type: "string", enum: ["day", "month", "trip", "night", "person", "lump sum", "workshop", "unit"] },
+          quantity: { type: "number" },
+          rate: { type: "number", description: "Unit rate in the proposal currency" },
+          basis: { type: "string", description: "Where the number comes from: team rate, TOR, past proposal, or estimate" },
+        },
+        required: ["category", "description", "expert_name", "unit", "quantity", "rate", "basis"],
+        additionalProperties: false,
+      },
+    },
+    notes: { type: "string", description: "Assumptions and exclusions, one per line starting with '- '" },
+  },
+  required: ["currency", "lines", "notes"],
+  additionalProperties: false,
+} as const;
+
+export type FinancialDraft = {
+  currency: string;
+  lines: { category: "FEES" | "TRAVEL" | "PER_DIEM" | "OTHER"; description: string; expert_name: string | null; unit: string; quantity: number; rate: number; basis: string | null }[];
+  notes: string | null;
 };

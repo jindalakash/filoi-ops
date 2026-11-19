@@ -6,13 +6,11 @@ import { PersonSelect } from "./forms";
 import { StatusBadge, TASK_STATUS, DueDate } from "./badges";
 import { saveTask } from "@/app/actions/tasks";
 import { inputDate } from "@/lib/format";
+import { SECTION_SUGGESTIONS, PART_GROUPS } from "@/lib/proposal-meta";
+import { PartsPicker } from "./PartsPicker";
+export { SECTION_SUGGESTIONS };
 
 type Opt = { id: string; name: string };
-
-export const SECTION_SUGGESTIONS = [
-  "Technical proposal – approach & methodology", "Understanding of the TOR", "Work plan & timeline", "Team composition & CVs",
-  "Relevant experience & references", "Financial proposal", "Compliance & declaration forms", "Company documents (registration, audited accounts)", "Final review & formatting",
-];
 
 export function Avatar({ name, size = "sm" }: { name?: string | null; size?: "sm" | "md" }) {
   if (!name) return <span className="text-xs text-ink-soft">Unassigned</span>;
@@ -25,8 +23,8 @@ export function Avatar({ name, size = "sm" }: { name?: string | null; size?: "sm
   );
 }
 
-export function TaskForm({ opportunityId, users, defaultReviewer, t, defaultDue }: {
-  opportunityId: string; users: Opt[]; defaultReviewer?: string | null; defaultDue?: Date | null;
+export function TaskForm({ opportunityId, users, defaultReviewer, t, defaultDue, existing = [] }: {
+  opportunityId: string; users: Opt[]; defaultReviewer?: string | null; defaultDue?: Date | null; existing?: string[];
   t?: { id: string; title: string; description: string | null; assigneeId: string | null; reviewerId: string | null; dueDate: Date | null };
 }) {
   return (
@@ -34,16 +32,20 @@ export function TaskForm({ opportunityId, users, defaultReviewer, t, defaultDue 
       <input type="hidden" name="opportunityId" value={opportunityId} />
       {t && <input type="hidden" name="id" value={t.id} />}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Part / task *" className="sm:col-span-2">
-          <input name="title" required defaultValue={t?.title} className="input" list="task-sections" placeholder="e.g. Team composition & CVs" />
-          <datalist id="task-sections">{SECTION_SUGGESTIONS.map((s) => <option key={s} value={s} />)}</datalist>
-        </Field>
+        {t ? (
+          <Field label="Part / task *" className="sm:col-span-2">
+            <input name="title" required defaultValue={t.title} className="input" list="task-sections" placeholder="e.g. Team composition & CVs" />
+            <datalist id="task-sections">{SECTION_SUGGESTIONS.map((s) => <option key={s} value={s} />)}</datalist>
+          </Field>
+        ) : (
+          <div className="sm:col-span-2 lg:col-span-4"><PartsPicker groups={PART_GROUPS} existing={existing} /></div>
+        )}
         <Field label="Assign to"><PersonSelect name="assigneeId" users={users} value={t?.assigneeId} /></Field>
         <Field label="Due date"><input type="date" name="dueDate" defaultValue={inputDate(t ? t.dueDate : defaultDue)} className="input" /></Field>
         <Field label="Instructions" className="sm:col-span-2 lg:col-span-3"><textarea name="description" rows={2} defaultValue={t?.description ?? ""} className="input" placeholder="What exactly is needed, page limits, templates to use…" /></Field>
         <Field label="Reviewer"><PersonSelect name="reviewerId" users={users} value={t ? t.reviewerId : defaultReviewer} placeholder="— Choose later —" /></Field>
       </div>
-      <div className="mt-3 flex justify-end"><SubmitButton className="btn-dark btn-sm">{t ? "Save task" : "Assign task"}</SubmitButton></div>
+      <div className="mt-3 flex justify-end"><SubmitButton className="btn-dark btn-sm">{t ? "Save task" : "Assign selected parts"}</SubmitButton></div>
     </ActionForm>
   );
 }

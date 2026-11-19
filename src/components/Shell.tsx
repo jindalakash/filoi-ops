@@ -6,6 +6,8 @@ import { useState } from "react";
 import clsx from "clsx";
 import { ThemeControls } from "./ThemeControls";
 import { CommandSearch } from "./CommandSearch";
+import { Suspense } from "react";
+import { AskAI } from "./AskAI";
 import { LayoutDashboard, ClipboardCheck, BookOpen, FileText, FolderKanban, ListChecks, Receipt, Building2, Users, Settings, LogOut, Menu, X } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ElementType; cap?: string };
@@ -87,6 +89,7 @@ export function Shell({ user, caps, logout, taskCount = 0, children }: { user: {
         <ThemeControls />
       </div>
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:pb-8 lg:pt-2">{children}</main>
+      <Suspense fallback={null}><AskAI /></Suspense>
     </div>
   );
 }

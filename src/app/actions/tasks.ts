@@ -5,8 +5,20 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { guard, req, str, dateOf, FormError } from "@/lib/form";
 import { logActivity } from "@/lib/activity";
-import { canManageTasks, isAssignee, isReviewer, notifyTask } from "@/lib/tasks";
+import { canManageTasks, isAssignee, isReviewer, notifyTask, notifyAssignedMany } from "@/lib/tasks";
 import type { ActionState } from "@/components/client";
+import { scopeForPart, STANDARD_SECTIONS } from "@/lib/proposal-meta";
+
+/** Find (or create) the workspace section a SECTION task writes into, so task and workspace edit the same text. */
+async function sectionFor(opportunityId: string, title: string) {
+  const all = await db.proposalSection.findMany({ where: { opportunityId }, select: { id: true, title: true } });
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const hit = all.find((x) => norm(x.title) === norm(title));
+  if (hit) return hit.id;
+  const std = STANDARD_SECTIONS.find((x) => norm(x.title) === norm(title));
+  const s = await db.proposalSection.create({ data: { opportunityId, title, guidance: std?.guidance ?? null, seq: all.length } });
+  return s.id;
+}
 
 function refresh(opportunityId: string, taskId?: string) {
   revalidatePath(`/opportunities/${opportunityId}`);
@@ -45,7 +57,6 @@ export async function saveTask(_: ActionState, fd: FormData): Promise<ActionStat
     const id = str(fd, "id");
     const opportunityId = req(fd, "opportunityId");
     const data = {
-      title: req(fd, "title", "Task"),
       description: str(fd, "description"),
       dueDate: dateOf(fd, "dueDate"),
       assigneeId: await activeUser(str(fd, "assigneeId"), "Assignee"),
@@ -53,7 +64,7 @@ export async function saveTask(_: ActionState, fd: FormData): Promise<ActionStat
     };
     if (id) {
       const before = await db.proposalTask.findUniqueOrThrow({ where: { id } });
-      const t = await db.proposalTask.update({ where: { id }, data });
+      const t = await db.proposalTask.update({ where: { id }, data: { ...data, title: req(fd, "title", "Task") } });
       if (t.assigneeId && t.assigneeId !== before.assigneeId) {
         await db.taskComment.create({ data: { taskId: id, userId: user.id, kind: "ASSIGNED" } });
         await notifyTask(id, "ASSIGNED", user.id);
@@ -61,13 +72,25 @@ export async function saveTask(_: ActionState, fd: FormData): Promise<ActionStat
       refresh(opportunityId, id);
       return { ok: "Task updated." };
     }
-    const seq = await db.proposalTask.count({ where: { opportunityId } });
-    const t = await db.proposalTask.create({ data: { ...data, opportunityId, seq, createdById: user.id } });
-    await db.taskComment.create({ data: { taskId: t.id, userId: user.id, kind: "ASSIGNED" } });
-    if (t.assigneeId) await notifyTask(t.id, "ASSIGNED", user.id);
-    await logActivity(user.id, "create", "opportunity", opportunityId, `Assigned “${t.title}”`);
-    refresh(opportunityId, t.id);
-    return { ok: `Task “${t.title}” added.` };
+    // one or more parts (multi-select), each its own task with the same person, reviewer and due date
+    const existing = new Set((await db.proposalTask.findMany({ where: { opportunityId }, select: { title: true } })).map((x) => x.title.trim().toLowerCase()));
+    const titles = [...new Set([...fd.getAll("titles").map(String), str(fd, "title") ?? ""].map((x) => x.trim()).filter(Boolean))]
+      .filter((x) => !existing.has(x.toLowerCase()));
+    if (!titles.length) throw new FormError("Pick at least one part (or add your own).");
+    let seq = await db.proposalTask.count({ where: { opportunityId } });
+    const created: string[] = [];
+    for (const title of titles) {
+      const scope = scopeForPart(title);
+      const sectionId = scope === "SECTION" ? await sectionFor(opportunityId, title) : null;
+      const t = await db.proposalTask.create({ data: { ...data, title, scope, sectionId, opportunityId, seq: seq++, createdById: user.id } });
+      await db.taskComment.create({ data: { taskId: t.id, userId: user.id, kind: "ASSIGNED" } });
+      created.push(t.id);
+    }
+    if (data.assigneeId) await notifyAssignedMany(created, user.id);
+    const who = data.assigneeId ? (await db.user.findUnique({ where: { id: data.assigneeId }, select: { name: true } }))?.name : null;
+    await logActivity(user.id, "create", "opportunity", opportunityId, `Assigned ${titles.length === 1 ? `“${titles[0]}”` : `${titles.length} parts`}${who ? ` to ${who}` : ""}`);
+    refresh(opportunityId);
+    return { ok: titles.length === 1 ? `Task “${titles[0]}” added.` : `${titles.length} tasks added${who ? ` for ${who}` : ""}.` };
   });
 }
 
@@ -150,5 +173,19 @@ export async function deleteTask(_: ActionState, fd: FormData): Promise<ActionSt
     refresh(t.opportunityId);
     if (str(fd, "back") === "1") redirect(`/opportunities/${t.opportunityId}`);
     return { ok: "Task deleted." };
+  });
+}
+
+/** For older tasks without a linked section: create/link it so the person can write here. */
+export async function startWritingTask(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  return guard(async () => {
+    const t = await db.proposalTask.findUniqueOrThrow({ where: { id: req(fd, "id") } });
+    if (!isAssignee(user, t) && !isReviewer(user, t) && !canManageTasks(user)) throw new FormError("Only people on this task can do that.");
+    const scope = scopeForPart(t.title);
+    const sectionId = scope === "SECTION" ? await sectionFor(t.opportunityId, t.title) : null;
+    await db.proposalTask.update({ where: { id: t.id }, data: { scope, sectionId, ...(t.status === "TODO" && isAssignee(user, t) ? { status: "IN_PROGRESS" } : {}) } });
+    refresh(t.opportunityId, t.id);
+    return { ok: "Ready — write below or let AI draft it." };
   });
 }

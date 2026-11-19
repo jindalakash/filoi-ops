@@ -53,3 +53,5 @@ templates-bank/**/*
 
 # backups (database + uploads)
 backups/
+
+.next.nosync/
