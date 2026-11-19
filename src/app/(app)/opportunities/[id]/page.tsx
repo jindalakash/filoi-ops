@@ -13,7 +13,7 @@ import { Amt } from "@/components/Money";
 import { date, splitEmails } from "@/lib/format";
 import { aiReady } from "@/lib/ai/run";
 import { IntakeUploader } from "@/components/IntakeUploader";
-import { analyzeTender } from "@/app/actions/intake";
+import { analyzeTender, discardExtraction } from "@/app/actions/intake";
 import { Sparkles } from "lucide-react";
 import { ProposalTasks } from "@/components/ProposalTasks";
 
@@ -27,6 +27,7 @@ export default async function OpportunityPage({ params }: PageProps<"/opportunit
   if (!o) notFound();
   const edit = can(user.role, "presales");
   const ready = edit && (await aiReady());
+  const pendingReading = edit ? await db.aiExtraction.findFirst({ where: { opportunityId: id, kind: "TENDER", status: "READY" }, orderBy: { createdAt: "desc" } }) : null;
   const tenderDocs = o.documents.filter((d) => d.category === "TOR" || d.category === "RFP");
   const docsNeeded = (o.requiredDocuments ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
 
@@ -47,6 +48,15 @@ export default async function OpportunityPage({ params }: PageProps<"/opportunit
         </>}
       />
 
+      {pendingReading && (
+        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-plum/30 bg-plum/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3 text-sm"><Sparkles size={18} className="mt-0.5 shrink-0 text-plum" /><div><b>An AI reading of the tender is waiting for your review.</b> Its values haven&apos;t been applied yet; continuing costs nothing.</div></div>
+          <span className="flex shrink-0 gap-2">
+            <Link href={`/opportunities/${id}/edit?intake=${pendingReading.id}`} className="btn-primary">Continue review →</Link>
+            <ConfirmAction action={discardExtraction} fields={{ id: pendingReading.id }} label="Discard" confirm="Discard this AI reading? The uploaded file stays on the proposal." className="btn-ghost" />
+          </span>
+        </div>
+      )}
       {o.project ? (
         <div className="mb-6"><Notice tone="ok">Contract won 🎉 — managed as project <Link className="link" href={`/projects/${o.project.id}`}>{o.project.code}</Link>.</Notice></div>
       ) : o.status === "WON" && can(user.role, "projects") ? (

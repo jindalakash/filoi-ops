@@ -43,6 +43,9 @@ export default async function NewOpportunity({ searchParams }: { searchParams: P
     );
   }
 
+  // Readings started earlier but never saved as a proposal (no new AI cost to continue)
+  const unfinished = await db.aiExtraction.findMany({ where: { kind: "TENDER", status: "READY", opportunityId: null }, orderBy: { createdAt: "desc" }, take: 5 });
+
   // Step 1: start from the TOR (or fill in manually)
   const manualForm = <Card className="max-w-5xl"><OpportunityForm o={{ ownerId: user.id }} clients={clients} users={users} cancel="/opportunities" /></Card>;
   return (
@@ -50,6 +53,24 @@ export default async function NewOpportunity({ searchParams }: { searchParams: P
       <PageHeader title="New proposal" subtitle="Start from the tender document — AI reads it and fills in the proposal for you to check." back={{ href: "/opportunities", label: "Proposals" }} />
       {sp.manual ? manualForm : (
         <div className="max-w-3xl space-y-4">
+          {unfinished.length > 0 && (
+            <Card title="Continue where you left off">
+              <ul className="space-y-2">
+                {unfinished.map((x) => {
+                  const r = x.result as { title?: string; client_name?: string };
+                  return (
+                    <li key={x.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="min-w-0 text-sm"><b className="block truncate">{r.title ?? "Tender reading"}</b><span className="text-xs text-ink-soft">{r.client_name ?? ""} · read {x.createdAt.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · not saved yet</span></span>
+                      <span className="flex shrink-0 gap-2">
+                        <Link href={`/opportunities/new?intake=${x.id}`} className="btn-primary btn-sm">Continue review →</Link>
+                        <ConfirmAction action={discardExtraction} fields={{ id: x.id }} label="Discard" confirm="Discard this reading and its uploaded file?" className="btn-ghost btn-sm" />
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          )}
           <Card title="1 · Upload the TOR / RFP">
             {ready ? (
               <IntakeUploader action={analyzeTender} label="Read the tender" hint="TOR, RFP, EOI and annexes · PDF (scanned is fine with Claude/Gemini), Word .docx or text" />

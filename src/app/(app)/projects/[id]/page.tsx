@@ -47,6 +47,8 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
       <IntakeUploader action={analyzeContract} hidden={{ projectId: id }} existing={contractDocs.map((d) => ({ id: d.id, fileName: d.fileName }))} label="Read contract" hint="Contract, PO or amendment · PDF, Word .docx or text" />
     </Card>
   ) : null;
+  // AI readings that were never applied or discarded — let the user pick up where they left off (no new AI charge)
+  const pending = editPM ? await db.aiExtraction.findMany({ where: { projectId: id, kind: "CONTRACT", status: "READY" }, orderBy: { createdAt: "desc" } }) : [];
   const applied = typeof sp.applied === "string" ? sp.applied.split("-").map(Number) : null;
   const cv = num(p.contractValue);
   const live = p.invoices.filter((i) => i.status !== "CANCELLED" && i.status !== "DRAFT");
@@ -75,6 +77,18 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           {can(user.role, "admin") && <ConfirmAction action={deleteProject} fields={{ id }} label="Delete" confirm="Delete this project, its deliverables and files?" className="btn-danger" />}
         </>}
       />
+      {pending.map((x) => {
+        const r = x.result as { deliverables?: unknown[]; payment_schedule?: unknown[] };
+        return (
+          <div key={x.id} className="mb-5 flex flex-col gap-3 rounded-xl border border-plum/30 bg-plum/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3 text-sm">
+              <Sparkles size={18} className="mt-0.5 shrink-0 text-plum" />
+              <div><b>An AI contract reading is waiting for your review</b> — {r.deliverables?.length ?? 0} deliverables and {r.payment_schedule?.length ?? 0} payments, read {x.createdAt.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}. Nothing has been added to the project yet; continuing costs nothing.</div>
+            </div>
+            <Link href={`/projects/${id}/intake/${x.id}`} className="btn-primary shrink-0">Continue review →</Link>
+          </div>
+        );
+      })}
       {applied && <div className="mb-5"><Notice tone="ok">Added {applied[0]} deliverable(s) and {applied[1]} billing milestone(s) from the contract.</Notice></div>}
       {sp.created && <div className="mb-5"><Notice tone="ok">Project created from the proposal. Next: upload the contract / PO in <b>Contract & files</b>, then add deliverables and billing milestones.</Notice></div>}
 
