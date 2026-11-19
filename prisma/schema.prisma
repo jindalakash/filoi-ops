@@ -38,6 +38,9 @@ model User {
   tasksToReview ProposalTask[] @relation("TaskReviewer")
   tasksCreated  ProposalTask[] @relation("TaskCreator")
   taskComments  TaskComment[]
+  workAssigned  WorkItem[]    @relation("WorkAssignee")
+  workReported  WorkItem[]    @relation("WorkReporter")
+  workComments  WorkComment[]
 }
 
 // ───────────────────────── Clients ─────────────────────────
@@ -168,6 +171,7 @@ model Project {
   milestones   Milestone[]
   invoices     Invoice[]
   documents    Document[]
+  workItems    WorkItem[]
 }
 
 enum DeliverableType {
@@ -207,6 +211,7 @@ model Deliverable {
 
   milestones Milestone[]
   documents  Document[]
+  workItems  WorkItem[]
 }
 
 // ───────────────────────── Finance ─────────────────────────
@@ -337,6 +342,8 @@ model Document {
   deliverable   Deliverable? @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
   proposalTaskId String?
   proposalTask   ProposalTask? @relation(fields: [proposalTaskId], references: [id], onDelete: SetNull)
+  workItemId    String?
+  workItem      WorkItem?    @relation(fields: [workItemId], references: [id], onDelete: SetNull)
   uploadedById  String?
   uploadedBy    User?        @relation(fields: [uploadedById], references: [id])
   createdAt     DateTime     @default(now())
@@ -599,4 +606,82 @@ model CashEntry {
   amountInr   Decimal  @db.Decimal(16, 2)
   kind        CashKind @default(OUT)
   createdAt   DateTime @default(now())
+}
+
+// ── Delivery work (Jira-style tasks & issues under projects / deliverables) ──
+
+enum WorkType {
+  TASK
+  ISSUE // reported by the client
+  CHANGE // change request
+}
+
+enum WorkPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+/// What a board column means for progress, whatever the admin calls it
+enum StatusCategory {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+/// Board columns (admin-editable later). Category drives progress maths.
+model WorkStatus {
+  id       String         @id @default(cuid())
+  name     String         @unique
+  category StatusCategory
+  color    String         @default("gray") // badge tone
+  seq      Int            @default(0)
+  active   Boolean        @default(true)
+  items    WorkItem[]
+}
+
+model WorkItem {
+  id            String       @id @default(cuid())
+  number        Int          @unique @default(autoincrement()) // shown as W-12
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliverableId String?
+  deliverable   Deliverable? @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
+  type          WorkType     @default(TASK)
+  title         String
+  description   String?
+  statusId      String
+  status        WorkStatus   @relation(fields: [statusId], references: [id])
+  priority      WorkPriority @default(MEDIUM)
+  assigneeId    String?
+  assignee      User?        @relation("WorkAssignee", fields: [assigneeId], references: [id])
+  reporterId    String?
+  reporter      User?        @relation("WorkReporter", fields: [reporterId], references: [id])
+  dueDate       DateTime?
+  position      Float        @default(0) // order within a board column
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  comments  WorkComment[]
+  documents Document[]
+
+  @@index([projectId])
+  @@index([deliverableId])
+  @@index([assigneeId])
+  @@index([statusId])
+}
+
+model WorkComment {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      WorkItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  kind      String   @default("COMMENT") // COMMENT | CREATED | STATUS | ASSIGNED
+  body      String?
+  createdAt DateTime @default(now())
+
+  @@index([itemId])
 }

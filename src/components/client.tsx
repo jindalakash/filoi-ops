@@ -65,12 +65,18 @@ export function Disclosure({ label, children, className = "btn-ghost btn-sm", de
 
 /** Auto-submitting select (status changes etc.) */
 export function AutoSelect({ action, name, value, options, hidden, className }: { action: Action; name: string; value: string; options: { value: string; label: string }[]; hidden: Record<string, string>; className?: string }) {
-  const [, run] = useActionState(action, undefined);
+  const [state, run] = useActionState(action, undefined);
   const ref = useRef<HTMLFormElement>(null);
+  // controlled, so React's automatic form reset after the action can't snap it back
+  const [current, setCurrent] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) { setSeen(value); setCurrent(value); }
+  const [failed, setFailed] = useState<ActionState>(undefined);
+  if (state !== failed && state?.error) { setFailed(state); setCurrent(value); }
   return (
-    <form action={run} ref={ref} className="inline">
+    <form action={run} ref={ref} className="inline" title={state?.error}>
       {Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-      <select name={name} defaultValue={value} onChange={() => ref.current?.requestSubmit()} className={clsx("input !w-auto !py-1 !text-xs", className)}>
+      <select name={name} value={current} onChange={(e) => { setCurrent(e.target.value); requestAnimationFrame(() => ref.current?.requestSubmit()); }} className={clsx("input !w-auto !py-1 !text-xs", className)}>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </form>

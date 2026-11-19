@@ -16,7 +16,8 @@ export async function GET(req: Request) {
   const lib = can(user.role, "presales") || can(user.role, "finance");
   const take = 5;
 
-  const [opps, projects, deliverables, clients, invoices, tasks, experts, refs, docs] = await Promise.all([
+  const wNum = /^w-?(\d+)$/i.exec(q.trim())?.[1];
+  const [opps, projects, deliverables, clients, invoices, tasks, experts, refs, docs, work] = await Promise.all([
     db.opportunity.findMany({ where: { OR: [{ title: ci(q) }, { code: ci(q) }, { referenceNo: ci(q) }, { client: { OR: [{ name: ci(q) }, { shortName: ci(q) }] } }] }, include: { client: true }, take, orderBy: { updatedAt: "desc" } }),
     db.project.findMany({ where: { OR: [{ title: ci(q) }, { code: ci(q) }, { contractNo: ci(q) }, { client: { OR: [{ name: ci(q) }, { shortName: ci(q) }] } }] }, include: { client: true }, take, orderBy: { updatedAt: "desc" } }),
     db.deliverable.findMany({ where: { title: ci(q) }, include: { project: true }, take, orderBy: { dueDate: "asc" } }),
@@ -26,13 +27,15 @@ export async function GET(req: Request) {
     lib ? db.expert.findMany({ where: { active: true, OR: [{ name: ci(q) }, { title: ci(q) }, { expertise: ci(q) }] }, take }) : Promise.resolve([]),
     lib ? db.reference.findMany({ where: { OR: [{ title: ci(q) }, { client: ci(q) }, { country: ci(q) }] }, take }) : Promise.resolve([]),
     db.document.findMany({ where: { fileName: ci(q) }, include: { opportunity: { select: { id: true, code: true } }, project: { select: { id: true, code: true } } }, take, orderBy: { createdAt: "desc" } }),
+    db.workItem.findMany({ where: wNum ? { number: Number(wNum) } : { OR: [{ title: ci(q) }, { description: ci(q) }] }, include: { project: { select: { code: true } } }, take, orderBy: { updatedAt: "desc" } }),
   ]);
 
   const groups: { label: string; hits: Hit[] }[] = [
     { label: "Proposals", hits: opps.map((o) => ({ type: "proposal", id: o.id, title: o.title, subtitle: `${o.code} · ${o.client.shortName || o.client.name}`, href: `/opportunities/${o.id}` })) },
     { label: "Projects", hits: projects.map((p) => ({ type: "project", id: p.id, title: p.title, subtitle: `${p.code} · ${p.client.shortName || p.client.name}`, href: `/projects/${p.id}` })) },
-    { label: "Deliverables", hits: deliverables.map((d) => ({ type: "deliverable", id: d.id, title: d.title, subtitle: d.project.code, href: `/projects/${d.projectId}` })) },
+    { label: "Deliverables", hits: deliverables.map((d) => ({ type: "deliverable", id: d.id, title: d.title, subtitle: d.project.code, href: `/projects/${d.projectId}?tab=deliverables` })) },
     { label: "Invoices", hits: invoices.map((i) => ({ type: "invoice", id: i.id, title: i.number, subtitle: i.client.shortName || i.client.name, href: `/finance/invoices/${i.id}` })) },
+    { label: "Delivery tasks & issues", hits: work.map((w) => ({ type: "task", id: w.id, title: w.title, subtitle: `W-${w.number} · ${w.project.code}`, href: `/work/${w.number}` })) },
     { label: "Tasks", hits: tasks.map((t) => ({ type: "task", id: t.id, title: t.title, subtitle: t.opportunity.code, href: `/tasks/${t.id}` })) },
     { label: "Clients", hits: clients.map((c) => ({ type: "client", id: c.id, title: c.name, subtitle: c.country, href: `/clients/${c.id}` })) },
     { label: "Experts", hits: experts.map((e) => ({ type: "expert", id: e.id, title: e.name, subtitle: e.title ?? e.expertise ?? undefined, href: `/library/experts/${e.id}` })) },

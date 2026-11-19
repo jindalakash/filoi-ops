@@ -9,7 +9,7 @@ import { AutoSelect, ConfirmAction, Disclosure } from "@/components/client";
 import { Documents } from "@/components/Documents";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { DeliverableForm, MilestoneForm, DL_TYPES } from "@/components/ProjectParts";
-import { ProgressLine, deliverableProgress } from "@/components/DeliverableProgress";
+import { ProgressLine, deliverableProgress, deliverablePct, progressItems } from "@/components/DeliverableProgress";
 import { setDeliverableStatus, deleteDeliverable, deleteProject } from "@/app/actions/projects";
 import { deleteMilestone } from "@/app/actions/finance";
 import { Amt } from "@/components/Money";
@@ -28,7 +28,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
     where: { id },
     include: {
       client: true, manager: true, opportunity: true,
-      deliverables: { include: { owner: true, milestones: true }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { seq: "asc" }] },
+      deliverables: { include: { owner: true, milestones: true, workItems: progressItems }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { seq: "asc" }] },
       milestones: { include: { deliverable: true, invoices: { where: { status: { not: "CANCELLED" } } } }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }] },
       invoices: { include: { payments: true }, orderBy: { issueDate: "desc" } },
       documents: { include: { uploadedBy: { select: { name: true } } }, orderBy: { createdAt: "desc" } },
@@ -134,6 +134,9 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                           <span>Owner: {d.owner?.name ?? "—"}</span>
                           {d.submittedAt && <span>Submitted {date(d.submittedAt)}</span>}
                           {d.acceptedAt && <span>Accepted {date(d.acceptedAt)}</span>}
+                          <Link href={`/board?project=${id}&deliverable=${d.id}`} className="font-semibold text-sky hover:underline">
+                            {Math.round(deliverablePct(d) * 100)}% · {d.workItems.length ? `${d.workItems.filter((w) => w.status.category === "DONE").length}/${d.workItems.length} tasks` : "no tasks"} →
+                          </Link>
                         </div>
                       </div>
                       <div className="flex shrink-0 items-start gap-2">

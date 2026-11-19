@@ -8,7 +8,7 @@ import { ThemeControls } from "./ThemeControls";
 import { CommandSearch } from "./CommandSearch";
 import { Suspense } from "react";
 import { AskAI } from "./AskAI";
-import { LayoutDashboard, ClipboardCheck, BookOpen, FileText, FolderKanban, ListChecks, Receipt, Building2, Users, Settings, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, BookOpen, FileText, FolderKanban, ListChecks, KanbanSquare, Receipt, Building2, Users, Settings, LogOut, Menu, X } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ElementType; cap?: string };
 const NAV: NavItem[] = [
@@ -16,7 +16,8 @@ const NAV: NavItem[] = [
   { href: "/tasks", label: "My tasks", icon: ClipboardCheck },
   { href: "/opportunities", label: "Proposals", icon: FileText, cap: "presalesView" },
   { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/deliverables", label: "Deliverables", icon: ListChecks },
+  { href: "/deliverables", label: "Delivery", icon: ListChecks },
+  { href: "/board", label: "Board", icon: KanbanSquare },
   { href: "/finance", label: "Finance", icon: Receipt, cap: "financeView" },
   { href: "/library", label: "Library", icon: BookOpen, cap: "library" },
   { href: "/clients", label: "Clients", icon: Building2 },

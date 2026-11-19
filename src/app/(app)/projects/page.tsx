@@ -6,7 +6,7 @@ import { can } from "@/lib/permissions";
 import { PageHeader, Card, Empty, Progress } from "@/components/ui";
 import { StatusBadge, PROJECT_STATUS, DueDate } from "@/components/badges";
 import { Amt } from "@/components/Money";
-import { deliverableProgress } from "@/components/DeliverableProgress";
+import { deliverableProgress, progressItems } from "@/components/DeliverableProgress";
 import { num } from "@/lib/format";
 import type { ProjectStatus } from "@prisma/client";
 
@@ -23,7 +23,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     },
     include: {
       client: true, manager: true,
-      deliverables: { select: { title: true, status: true, dueDate: true } },
+      deliverables: { select: { title: true, status: true, dueDate: true, workItems: progressItems } },
       invoices: { where: { status: { not: "CANCELLED" } }, select: { subtotal: true } },
     },
     orderBy: { createdAt: "desc" },

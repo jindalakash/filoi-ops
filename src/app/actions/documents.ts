@@ -13,7 +13,7 @@ export async function uploadDocuments(_: ActionState, fd: FormData): Promise<Act
     const files = fd.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
     if (!files.length) return { error: "Choose at least one file." };
     const category = (str(fd, "category") || "OTHER") as DocCategory;
-    const link = { opportunityId: str(fd, "opportunityId") ?? null, projectId: str(fd, "projectId") ?? null, deliverableId: str(fd, "deliverableId") ?? null, proposalTaskId: str(fd, "proposalTaskId") ?? null };
+    const link = { opportunityId: str(fd, "opportunityId") ?? null, projectId: str(fd, "projectId") ?? null, deliverableId: str(fd, "deliverableId") ?? null, proposalTaskId: str(fd, "proposalTaskId") ?? null, workItemId: str(fd, "workItemId") ?? null };
     for (const f of files) {
       const saved = await saveUpload(f);
       await db.document.create({ data: { ...saved, category, ...link, uploadedById: user.id } });
