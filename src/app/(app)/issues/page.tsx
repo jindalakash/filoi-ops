@@ -11,6 +11,7 @@ import { WORK_PRIORITY, workKey, workFormExtras } from "@/lib/work";
 import { optionLabels } from "@/lib/custom";
 import { date } from "@/lib/format";
 import type { Prisma } from "@prisma/client";
+import { Paperclip } from "lucide-react";
 
 export const metadata = { title: "Client issues" };
 
@@ -29,7 +30,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Promi
     Promise.all(views.map(async ([k]) => [k, await db.workItem.count({ where: where[k] })] as const)).then(Object.fromEntries),
     db.workItem.findMany({
       where: where[v] ?? where.open,
-      include: { status: true, assignee: { select: { name: true } }, project: { select: { id: true, code: true } }, deliverable: { select: { title: true } } },
+      include: { status: true, assignee: { select: { name: true } }, project: { select: { id: true, code: true } }, deliverable: { select: { title: true } }, _count: { select: { documents: true } } },
       orderBy: [{ reportedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
       take: 300,
     }),
@@ -71,7 +72,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Promi
             <thead><tr><th>Issue</th><th>Project</th><th>Severity</th><th>Reported</th><th>Response</th><th>Fix by</th><th>Owner</th><th>Status</th></tr></thead>
             <tbody>{items.map((i) => (
               <tr key={i.id}>
-                <td className="min-w-64"><Link href={`/work/${i.number}`} className="font-semibold hover:text-plum">{i.title}</Link><div className="font-mono text-xs text-ink-soft">{workKey(i.number)}</div></td>
+                <td className="min-w-64"><Link href={`/work/${i.number}`} className="font-semibold hover:text-plum">{i.title}</Link><div className="flex items-center gap-2 text-xs text-ink-soft"><span className="font-mono">{workKey(i.number)}</span>{i._count.documents > 0 && <span className="inline-flex items-center gap-0.5" title="Attachments"><Paperclip size={12} />{i._count.documents}</span>}</div></td>
                 <td><Link className="link" href={`/projects/${i.project.id}`}>{i.project.code}</Link>{i.deliverable && <div className="max-w-48 truncate text-xs text-ink-soft">{i.deliverable.title}</div>}</td>
                 <td><Badge tone={WORK_PRIORITY[i.priority].tone}>{WORK_PRIORITY[i.priority].label}</Badge></td>
                 <td className="whitespace-nowrap text-xs">{i.reportedAt ? date(i.reportedAt) : "—"}<div className="text-ink-soft">{[i.clientContact, i.source && SRC[i.source]].filter(Boolean).join(" · ")}</div></td>

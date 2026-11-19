@@ -112,7 +112,6 @@ export async function invoicePdf(invoiceId: string) {
             </View>
           ))}
           <Text style={{ fontSize: 8, fontStyle: "italic", textAlign: "right", marginTop: 3 }}>{amountInWords(inv.total, c)}</Text>
-          {c !== "INR" && <Text style={[s.soft, { fontSize: 8, textAlign: "right" }]}>INR equivalent @ {num(inv.exchangeRate)}: {amt(num(inv.total) * num(inv.exchangeRate), "INR")}</Text>}
         </View>
 
         {inv.notes && <View style={{ marginTop: 12 }}><Text style={s.label}>Notes</Text><Text>{inv.notes}</Text></View>}

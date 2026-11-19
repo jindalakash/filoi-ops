@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { PageHeader, Card, KV } from "@/components/ui";
 import { Badge, DueDate } from "@/components/badges";
 import { ActionForm, SubmitButton, AutoSelect, ConfirmAction, Disclosure } from "@/components/client";
-import { Documents } from "@/components/Documents";
+import { WorkAttachments } from "@/components/WorkAttachments";
 import { StatusPill, ResponseState } from "@/components/WorkParts";
 import { WorkItemForm } from "@/components/WorkForm";
 import { addWorkComment, deleteWorkItem, setWorkStatus, convertToTask } from "@/app/actions/work";
@@ -75,7 +75,7 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
             )}
           </Card>
 
-          <Documents docs={i.documents} link={{ workItemId: i.id }} path={`/work/${i.number}`} defaultCategory="OTHER" categories={["CORRESPONDENCE", "OTHER"]} title="Attachments" />
+          <WorkAttachments itemId={i.id} path={`/work/${i.number}`} docs={i.documents} isIssue={i.type === "ISSUE"} />
 
           <Card title="Activity & comments">
             <ol className="space-y-4">

@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { canEditItem, canMoveItem, notifyWorkAssigned, workKey, applyTemplateTo } from "@/lib/work";
 import { notifyUsers, mentionedUsers, commentHtml } from "@/lib/notify";
 import { readCustom } from "@/lib/custom";
+import { saveUpload } from "@/lib/files";
 import type { ActionState } from "@/components/client";
 import type { WorkPriority, WorkType } from "@prisma/client";
 
@@ -94,10 +95,16 @@ export async function saveWorkItem(_: ActionState, fd: FormData): Promise<Action
       data: { ...data, ...extra, ...(labelIds?.length ? { labels: { connect: labelIds.map((id) => ({ id })) } } : {}), projectId, statusId: status.id, reporterId: user.id, position: await nextPosition(status.id), completedAt: status.category === "DONE" ? new Date() : null },
     });
     await db.workComment.create({ data: { itemId: item.id, userId: user.id, kind: "CREATED" } });
+    // screenshots / files attached while logging it
+    const files = fd.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+    for (const f of files) {
+      const saved = await saveUpload(f);
+      await db.document.create({ data: { ...saved, category: type === "ISSUE" ? "CORRESPONDENCE" : "OTHER", workItemId: item.id, uploadedById: user.id } });
+    }
     await logActivity(user.id, "create", "work", item.id, `${workKey(item.number)} “${item.title}” created`);
     if (item.assigneeId) await notifyWorkAssigned(item.id, user.id);
     refresh(projectId, item.number);
-    return { ok: `${workKey(item.number)} created.` };
+    return { ok: `${workKey(item.number)} created${files.length ? ` with ${files.length} attachment${files.length > 1 ? "s" : ""}` : ""}.` };
   });
 }
 

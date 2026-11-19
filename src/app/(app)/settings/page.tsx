@@ -12,6 +12,7 @@ import { AiSettingsForm } from "@/components/AiSettingsForm";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { ColumnsEditor, LabelsEditor, ListEditor, FieldsEditor } from "@/components/CustomiseEditors";
 import { LISTS, ENTITIES, FIELD_TYPES, options, type ListKey } from "@/lib/custom";
+import { EmailsInput } from "@/components/EmailsInput";
 
 export const metadata = { title: "Settings" };
 
@@ -104,7 +105,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               <Field label="Days after (overdue)"><input name="overdueDays" defaultValue={rem.overdueDays} className="input" /></Field>
               <Field label="Send at hour (0–23, server time)"><input name="hour" type="number" min={0} max={23} defaultValue={rem.hour} className="input" /></Field>
               <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="weeklyDigest" defaultChecked={rem.weeklyDigest !== false} className="mt-0.5 h-4 w-4 accent-plum" /> <span><b>Monday digest</b> — email each person their overdue tasks and what&apos;s due this week</span></label>
-              <Field label="Always copy (finance) emails" hint="Gets invoicing & payment reminders for every project."><input name="digestEmails" defaultValue={rem.digestEmails} className="input" /></Field>
+              <Field label="Always copy (finance) emails" hint="Gets invoicing & payment reminders for every project."><EmailsInput name="digestEmails" defaultValue={rem.digestEmails} /></Field>
               <SubmitButton className="btn-primary w-full">Save</SubmitButton>
             </ActionForm>
             <ActionForm action={runRemindersNow} className="mt-4 border-t border-line pt-4">

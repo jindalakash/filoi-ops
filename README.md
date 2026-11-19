@@ -84,16 +84,11 @@ After pulling changes that add a database migration, run `npm run db:migrate` an
 
 ## Deploy on Hostinger (VPS)
 
-1. Create a KVM VPS (Ubuntu 24.04, 2 GB+ RAM) and install Docker.
-2. Copy this folder to the server (git or `scp`).
-3. `cp .env.example .env` and set `POSTGRES_PASSWORD`, `SESSION_SECRET`, `ENCRYPTION_KEY`,
-   `ADMIN_PASSWORD`, `APP_URL=https://ops.filoi.in`, `COOKIE_SECURE=1`.
-4. `docker compose up -d --build`
-5. `docker compose exec app node node_modules/tsx/dist/cli.mjs prisma/seed.ts`
-6. Point a subdomain (e.g. `ops.filoi.in`) to the VPS and put Caddy in front for HTTPS:
-   `ops.filoi.in { reverse_proxy 127.0.0.1:3000 }`
+Step-by-step guide — DNS, firewall, Docker, moving your data from the Mac, HTTPS, email, backups and updates:
+**[DEPLOY.md](DEPLOY.md)**.
 
-Back up the `pgdata` and `uploads` Docker volumes (e.g. nightly `pg_dump` + rsync).
+Short version: `cp .env.example .env` (set `POSTGRES_PASSWORD`, `SESSION_SECRET`, `ENCRYPTION_KEY`,
+`APP_URL=https://ops.filoi.in`, `COOKIE_SECURE=1`) → `docker compose up -d --build` → Caddy in front for HTTPS.
 
 ## Roadmap
 

@@ -4,6 +4,7 @@ import { ActionForm, SubmitButton } from "./client";
 import { saveWorkItem } from "@/app/actions/work";
 import { CustomFieldInputs } from "./CustomFieldInputs";
 import { LabelChip } from "./LabelChip";
+import { AttachmentPicker } from "./AttachmentPicker";
 import type { FieldDef, CustomValues } from "@/lib/custom";
 
 type Opt = { id: string; name: string };
@@ -101,6 +102,11 @@ export function WorkItemForm({ projects, users, item, projectId, deliverableId, 
           </fieldset>
         )}
         <CustomFieldInputs fields={fields} values={item?.custom} users={users} />
+        {!item && (
+          <div className="sm:col-span-2 lg:col-span-4">
+            <AttachmentPicker label={issue ? "Screenshots & files from the client" : "Attachments"} />
+          </div>
+        )}
       </div>
       <div className="mt-3 flex justify-end"><SubmitButton className="btn-dark btn-sm">{item ? "Save" : "Create"}</SubmitButton></div>
     </ActionForm>

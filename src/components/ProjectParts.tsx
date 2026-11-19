@@ -7,6 +7,7 @@ import { inputDate, num } from "@/lib/format";
 import type { Deliverable, Milestone } from "@prisma/client";
 import { CustomFieldInputs } from "./CustomFieldInputs";
 import type { FieldDef, CustomValues } from "@/lib/custom";
+import { EmailsInput } from "./EmailsInput";
 
 
 export function DeliverableForm({ projectId, d, users, withBilling, currency, types, fields = [] }: { projectId: string; d?: Deliverable; users: { id: string; name: string }[]; withBilling?: boolean; currency: string; types: { value: string; label: string }[]; fields?: FieldDef[] }) {
@@ -20,7 +21,7 @@ export function DeliverableForm({ projectId, d, users, withBilling, currency, ty
         <Field label="Due date"><input type="date" name="dueDate" defaultValue={inputDate(d?.dueDate)} className="input" /></Field>
         <Field label="Description / acceptance criteria" className="sm:col-span-2"><textarea name="description" rows={2} defaultValue={d?.description ?? ""} className="input" /></Field>
         <Field label="Owner"><PersonSelect name="ownerId" users={users} value={d?.ownerId} /></Field>
-        <Field label="Extra alert emails"><input name="alertEmails" defaultValue={d?.alertEmails ?? ""} className="input" placeholder="optional" /></Field>
+        <Field label="Extra alert emails" className="sm:col-span-2"><EmailsInput name="alertEmails" defaultValue={d?.alertEmails} placeholder="Optional — pick people or type emails" /></Field>
         {withBilling && !d && (
           <>
             <div className="sm:col-span-2 lg:col-span-4 -mb-1 mt-1 text-xs font-semibold text-plum">Payment linked to this deliverable (optional)</div>

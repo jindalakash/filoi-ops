@@ -56,3 +56,30 @@ export function CollapseAllButtons({ scope, ids }: { scope: string; ids: string[
     </button>
   );
 }
+
+/** A table section (one <tbody>) with a clickable header row that folds its rows away. */
+export function GroupTbody({ scope, id, colSpan, header, summary, children }: { scope: string; id: string; colSpan: number; header: React.ReactNode; summary?: React.ReactNode; children: React.ReactNode }) {
+  const collapsed = useCollapsed(scope).has(id);
+  const toggle = () => {
+    const now = read(scope);
+    write(scope, collapsed ? now.filter((x) => x !== id) : [...now, id]);
+    play(collapsed ? "pop" : "close");
+  };
+  return (
+    <tbody>
+      <tr className="cursor-pointer select-none !bg-mist/70 hover:!bg-mist" onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button")) toggle(); }}>
+        <td colSpan={colSpan} className="!py-2.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <button type="button" data-silent onClick={toggle} aria-expanded={!collapsed} aria-label={collapsed ? "Expand" : "Collapse"}
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-soft hover:bg-surface hover:text-ink">
+              <ChevronRight size={16} className={clsx("transition-transform duration-200", !collapsed && "rotate-90")} />
+            </button>
+            <div className="min-w-0 flex-1 font-semibold">{header}</div>
+            {summary && <div className="text-sm text-ink-soft">{summary}</div>}
+          </div>
+        </td>
+      </tr>
+      {!collapsed && children}
+    </tbody>
+  );
+}

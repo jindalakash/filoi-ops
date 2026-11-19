@@ -85,7 +85,6 @@ export function InvoiceDocument({ inv, company }: { inv: Invoice & { items: Invo
         </table>
       </div>
       <div className="mt-1 text-right text-xs italic">{amountInWords(inv.total, c)}</div>
-      {c !== "INR" && <div className="mt-1 text-right text-xs text-ink-soft">INR equivalent @ {num(inv.exchangeRate)}: ₹{new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(num(inv.total) * num(inv.exchangeRate))}</div>}
 
       {inv.notes && <div className="mt-5"><div className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Notes</div><p className="whitespace-pre-line">{inv.notes}</p></div>}
 

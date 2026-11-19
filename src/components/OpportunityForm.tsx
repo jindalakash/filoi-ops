@@ -8,6 +8,7 @@ import { CurrencySelect, PersonSelect, FormFooter } from "./forms";
 import { saveOpportunity } from "@/app/actions/opportunities";
 import { inputDate, num } from "@/lib/format";
 import type { Opportunity } from "@prisma/client";
+import { EmailsInput } from "./EmailsInput";
 
 type Opt = { id: string; name: string };
 
@@ -67,7 +68,7 @@ export function OpportunityForm({ o, clients, users, cancel, newClient, intakeId
             <Field label="Eligibility / qualification criteria"><textarea name="eligibility" rows={5} defaultValue={o?.eligibility ?? ""} className="input" /></Field>
             <Field label="Documents to submit" hint="One per line — shown as a checklist."><textarea name="requiredDocuments" rows={5} defaultValue={o?.requiredDocuments ?? ""} className="input" placeholder={"Technical proposal\nFinancial proposal\nCVs of key experts\nCompany registration certificate"} /></Field>
             <Field label="Internal notes"><textarea name="notes" rows={5} defaultValue={o?.notes ?? ""} className="input" /></Field>
-            <Field label="Alert emails" hint="Comma-separated. Deadline reminders go here + the owner." className="lg:col-span-2"><input name="alertEmails" defaultValue={o?.alertEmails ?? ""} className="input" placeholder="bids@filoi.in, akash@filoi.in" /></Field>
+            <Field label="Alert emails" hint="Deadline reminders go to these people + the owner. Pick app users or type any email and press Enter." className="lg:col-span-2"><EmailsInput name="alertEmails" defaultValue={o?.alertEmails} /></Field>
           </div>
         </section>
       </div>

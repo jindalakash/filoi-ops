@@ -19,7 +19,9 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://filoi:${POSTGRES_PASSWORD}@db:5432/filoi_ops
-      TZ: Asia/Kolkata
+      UPLOAD_DIR: /app/storage/uploads   # fixed here so a copied .env can't point uploads outside the volume
+      BACKUP_DIR: /app/backups
+      TZ: Asia/Kolkata                    # reminders & backups run on India time
     ports:
       - "127.0.0.1:3000:3000"   # put Caddy/Nginx in front for HTTPS
     volumes:
