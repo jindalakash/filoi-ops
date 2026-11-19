@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { PageHeader, Card, KV, Field, Empty } from "@/components/ui";
+import { PageHeader, Card, KV, Empty } from "@/components/ui";
 import { StatusBadge, INV_STATUS, DueDate } from "@/components/badges";
-import { ActionForm, ConfirmAction, SubmitButton } from "@/components/client";
-import { setInvoiceStatus, deleteInvoice, recordPayment, deletePayment } from "@/app/actions/finance";
+import { ConfirmAction } from "@/components/client";
+import { setInvoiceStatus, deleteInvoice, deletePayment } from "@/app/actions/finance";
+import { PaymentForm } from "@/components/PaymentForm";
 import { SUPPLY_LABEL } from "@/lib/tax";
 import { Amt } from "@/components/Money";
 import { money, date, num, inputDate } from "@/lib/format";
@@ -21,7 +22,7 @@ export default async function InvoicePage({ params }: PageProps<"/finance/invoic
   const c = inv.currency;
   const settled = inv.payments.reduce((a, p) => a + num(p.amount) + num(p.tds) + num(p.bankCharges), 0);
   const balance = Math.max(0, num(inv.total) - settled);
-  const inrReceived = inv.payments.reduce((a, p) => a + num(p.amount) * num(p.exchangeRate), 0);
+  const inrReceived = inv.payments.reduce((a, p) => a + (p.amountInr != null ? num(p.amountInr) : num(p.amount) * num(p.exchangeRate)), 0);
 
   return (
     <>
@@ -64,35 +65,35 @@ export default async function InvoicePage({ params }: PageProps<"/finance/invoic
             </div>
             {inv.payments.length === 0 ? <Empty title="No payments yet" /> : (
               <ul className="divide-y divide-line text-sm">
-                {inv.payments.map((p) => (
-                  <li key={p.id} className="flex items-start justify-between gap-2 py-2.5">
-                    <div>
-                      <div className="font-semibold"><Amt v={p.amount} c={c} /> <span className="font-normal text-ink-soft">on {date(p.date)}</span></div>
-                      <div className="text-xs text-ink-soft">
-                        {num(p.tds) > 0 && `TDS ${money(p.tds, c)} · `}{num(p.bankCharges) > 0 && `Bank charges ${money(p.bankCharges, c)} · `}
-                        {c !== "INR" && `@ ₹${num(p.exchangeRate)} · `}{p.reference}
-                      </div>
-                    </div>
-                    {edit && <ConfirmAction action={deletePayment} fields={{ id: p.id }} label="✕" confirm="Remove this payment?" className="text-xs text-ink-soft hover:text-red-700" />}
-                  </li>
-                ))}
+                {(() => {
+                  let running = num(inv.total);
+                  return inv.payments.map((p) => {
+                    const settles = num(p.amount) + num(p.tds) + num(p.bankCharges);
+                    running -= settles;
+                    const inrIn = p.amountInr != null ? num(p.amountInr) : num(p.amount) * num(p.exchangeRate);
+                    return (
+                      <li key={p.id} className="flex items-start justify-between gap-2 py-2.5">
+                        <div>
+                          <div className="font-semibold">{money(inrIn, "INR")} <span className="font-normal text-ink-soft">on {date(p.date)}</span> {running > 0.01 ? <span className="ml-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">Partial</span> : <span className="ml-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">Settled</span>}</div>
+                          <div className="text-xs text-ink-soft">
+                            {[
+                              c !== "INR" ? `Settles ${money(settles, c)} @ ₹${num(p.exchangeRate).toFixed(2)}` : null,
+                              num(p.tds) > 0 ? `TDS ${money(num(p.tds) * num(p.exchangeRate), "INR")}` : null,
+                              num(p.bankCharges) > 0 ? `Bank charges ${money(num(p.bankCharges) * num(p.exchangeRate), "INR")}` : null,
+                              p.reference || null,
+                            ].filter(Boolean).join(" · ")}
+                          </div>
+                        </div>
+                        {edit && <ConfirmAction action={deletePayment} fields={{ id: p.id }} label="✕" confirm="Remove this payment?" className="text-xs text-ink-soft hover:text-red-700" />}
+                      </li>
+                    );
+                  });
+                })()}
               </ul>
             )}
-            {c !== "INR" && inrReceived > 0 && <p className="mt-2 text-xs text-ink-soft">Realised in INR: ₹{new Intl.NumberFormat("en-IN").format(Math.round(inrReceived))}</p>}
+            {inrReceived > 0 && <p className="mt-2 text-xs text-ink-soft">Total credited to bank: <b className="text-ink">₹{new Intl.NumberFormat("en-IN").format(Math.round(inrReceived))}</b></p>}
             {edit && ["SENT", "PARTIALLY_PAID"].includes(inv.status) && (
-              <ActionForm action={recordPayment} resetOnOk className="mt-4 space-y-3 border-t border-line pt-4">
-                <input type="hidden" name="invoiceId" value={id} />
-                <div className="text-sm font-semibold">Record payment</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label={`Received (${c})`}><input name="amount" inputMode="decimal" required defaultValue={balance || ""} className="input" /></Field>
-                  <Field label="Date"><input type="date" name="date" defaultValue={inputDate(new Date())} className="input" /></Field>
-                  <Field label="TDS deducted"><input name="tds" inputMode="decimal" className="input" /></Field>
-                  <Field label="Bank charges"><input name="bankCharges" inputMode="decimal" className="input" /></Field>
-                  {c !== "INR" && <Field label="Realised rate (₹)"><input name="exchangeRate" inputMode="decimal" defaultValue={num(inv.exchangeRate)} className="input" /></Field>}
-                  <Field label="Reference / UTR"><input name="reference" className="input" /></Field>
-                </div>
-                <SubmitButton className="btn-primary w-full">Save payment</SubmitButton>
-              </ActionForm>
+              <PaymentForm invoiceId={id} currency={c} balance={balance} today={inputDate(new Date())} />
             )}
             {inv.status === "DRAFT" && <p className="mt-3 text-xs text-ink-soft">Mark the invoice as sent to start recording payments.</p>}
           </Card>

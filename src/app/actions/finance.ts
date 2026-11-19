@@ -133,31 +133,53 @@ export async function deleteInvoice(_: ActionState, fd: FormData): Promise<Actio
   });
 }
 
+/**
+ * Record a payment as received in the bank (always INR). For foreign-currency invoices the user says whether it
+ * settles the full balance or only part of it (in the invoice currency); the realised rate is worked out from that.
+ */
 export async function recordPayment(_: ActionState, fd: FormData): Promise<ActionState> {
   const user = await requireUser("finance");
   return guard(async () => {
     const invoiceId = req(fd, "invoiceId");
-    const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+    const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { payments: true } });
     if (inv.status === "DRAFT" || inv.status === "CANCELLED") return { error: "Mark the invoice as sent before recording payments." };
-    const amount = numOf(fd, "amount");
-    if (!amount || amount <= 0) throw new FormError("Enter the amount received.");
+    const credited = numOf(fd, "amountInr");
+    if (!credited || credited <= 0) throw new FormError("Enter the amount credited to the bank in ₹.");
+    const tdsInr = numOf(fd, "tdsInr") ?? 0;
+    const bankInr = numOf(fd, "bankInr") ?? 0;
+    const balance = Math.max(0, num(inv.total) - inv.payments.reduce((a, p) => a + num(p.amount) + num(p.tds) + num(p.bankCharges), 0));
+    const r2 = (x: number) => Math.round(x * 100) / 100;
+
+    let covered: number, rate: number;
+    if (inv.currency === "INR") {
+      covered = credited + tdsInr + bankInr; // INR invoice: what's settled is what arrived plus deductions
+      rate = 1;
+    } else {
+      covered = fd.get("covers") === "partial" ? numOf(fd, "coveredAmount") ?? 0 : balance;
+      if (!covered || covered <= 0) throw new FormError(`Enter how much of the invoice (in ${inv.currency}) this payment settles.`);
+      if (covered > balance + 0.01) throw new FormError(`That is more than the outstanding balance (${money(balance, inv.currency)}).`);
+      rate = (credited + tdsInr + bankInr) / covered; // realised ₹ per unit of invoice currency
+    }
+    const tds = r2(tdsInr / rate), bank = r2(bankInr / rate);
     await db.payment.create({
       data: {
         invoiceId,
         date: dateOf(fd, "date") ?? new Date(),
-        amount,
-        tds: numOf(fd, "tds") ?? 0,
-        bankCharges: numOf(fd, "bankCharges") ?? 0,
-        exchangeRate: numOf(fd, "exchangeRate") ?? num(inv.exchangeRate),
+        amount: r2(covered - tds - bank),
+        tds,
+        bankCharges: bank,
+        exchangeRate: Math.round(rate * 10000) / 10000,
+        amountInr: credited,
         reference: str(fd, "reference"),
         notes: str(fd, "notes"),
       },
     });
     await refreshInvoiceStatus(invoiceId);
-    await logActivity(user.id, "payment", "invoice", invoiceId, `Recorded ${money(amount, inv.currency)} against ${inv.number}`);
+    const left = r2(balance - covered);
+    await logActivity(user.id, "payment", "invoice", invoiceId, `Recorded ₹${new Intl.NumberFormat("en-IN").format(credited)} against ${inv.number}${inv.currency !== "INR" ? ` (settles ${money(covered, inv.currency)} @ ₹${rate.toFixed(2)})` : ""}${left > 0.01 ? " — partial" : ""}`);
     revalidatePath(`/finance/invoices/${invoiceId}`);
     revalidatePath("/finance");
-    return { ok: "Payment recorded." };
+    return { ok: left > 0.01 ? `Partial payment recorded. Still due: ${money(left, inv.currency)}.` : "Payment recorded — invoice fully settled." };
   });
 }
 

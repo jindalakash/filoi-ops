@@ -63,7 +63,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     const fwd = new Map(months.map((m) => [monthKey(m), 0]));
     for (const m of planned) { const k = monthKey(m.dueDate!); fwd.set(k, (fwd.get(k) ?? 0) + toINR(m.amount, m.project.currency, fx)); }
     const back = new Map(past.map((m) => [monthKey(m), 0]));
-    for (const p of payments) { const k = monthKey(p.date); if (back.has(k)) back.set(k, back.get(k)! + num(p.amount) * (p.invoice.currency === "INR" ? 1 : num(p.exchangeRate))); }
+    for (const p of payments) { const k = monthKey(p.date); if (back.has(k)) back.set(k, back.get(k)! + (p.amountInr != null ? num(p.amountInr) : num(p.amount) * (p.invoice.currency === "INR" ? 1 : num(p.exchangeRate)))); }
     const overdueInv = await db.invoice.findMany({ where: { status: { in: ["SENT", "PARTIALLY_PAID"] }, dueDate: { lt: today } }, include: { client: true, payments: true }, orderBy: { dueDate: "asc" }, take: 6 });
     const S = (t: typeof snap.received) => <MultiMoney totals={t} inr={sumINR(t, fx)} />;
 

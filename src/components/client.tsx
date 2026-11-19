@@ -20,13 +20,16 @@ export function SubmitButton({ children, className = "btn-primary", pendingText 
 export function ActionForm({ action, children, className, resetOnOk, onOk }: { action: Action; children: React.ReactNode; className?: string; resetOnOk?: boolean; onOk?: () => void }) {
   const [state, run] = useActionState(action, undefined);
   const ref = useRef<HTMLFormElement>(null);
+  const onOkRef = useRef(onOk);
+  useEffect(() => { onOkRef.current = onOk; });
+  // runs once per action result (not on every re-render)
   useEffect(() => {
     if (state?.ok) {
       play("success");
       if (resetOnOk) ref.current?.reset();
-      onOk?.();
+      onOkRef.current?.();
     } else if (state?.error) play("error");
-  }, [state, resetOnOk, onOk]);
+  }, [state, resetOnOk]);
   return (
     <form ref={ref} action={run} className={className}>
       {state?.error && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{state.error}</div>}

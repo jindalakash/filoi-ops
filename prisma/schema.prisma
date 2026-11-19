@@ -301,6 +301,7 @@ model Payment {
   tds          Decimal  @default(0) @db.Decimal(16, 2) // tax deducted by client
   bankCharges  Decimal  @default(0) @db.Decimal(16, 2)
   exchangeRate Decimal  @default(1) @db.Decimal(12, 4) // realised INR rate
+  amountInr    Decimal? @db.Decimal(16, 2) // exact amount credited to the bank in INR
   reference    String?
   notes        String?
   createdAt    DateTime @default(now())
