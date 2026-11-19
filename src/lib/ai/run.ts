@@ -3,11 +3,11 @@ import { getSetting, type AiSettings } from "../settings";
 import { decrypt } from "../crypto";
 import { modelMatchesProvider } from "./models";
 import { documentText, isPdf, type SourceDoc } from "./text";
-import { TENDER_SCHEMA, CONTRACT_SCHEMA, CV_SCHEMA, FINANCIAL_SCHEMA, type TenderExtraction, type ContractExtraction, type CvExtraction, type FinancialDraft } from "./schemas";
+import { TENDER_SCHEMA, CONTRACT_SCHEMA, CV_SCHEMA, FINANCIAL_SCHEMA, WORKPLAN_SCHEMA, type TenderExtraction, type ContractExtraction, type CvExtraction, type FinancialDraft, type WorkPlan } from "./schemas";
 
 export class AiError extends Error {}
 
-type Kind = "TENDER" | "CONTRACT" | "CV" | "FINANCIAL";
+type Kind = "TENDER" | "CONTRACT" | "CV" | "FINANCIAL" | "WORKPLAN";
 export type RunResult<T> = { data: T; provider: string; model: string; inputTokens?: number; outputTokens?: number };
 
 const MAX_PDF_BYTES = 24 * 1024 * 1024; // Claude request limit is 32 MB (base64 adds ~33%)
@@ -28,6 +28,14 @@ Rules:
 - Evidence: give a short verbatim quote (under 30 words) for each key value you filled — title, client, deadline(s), budget/value, evaluation, and any payment terms — with the page number when you can tell it.
 - If several documents are given (e.g. TOR plus annexes), combine them.
 - File names are not data: never use a file name as a value (e.g. for source or reference).`;
+  if (kind === "WORKPLAN")
+    return `${common}
+Task: break ONE contract deliverable into the concrete tasks the delivery team must complete to produce it on time.
+- 3 to 8 tasks, in the order they happen; each finishes before the next starts where that makes sense. Include internal quality review before anything goes to the client, and the hand-over/submission step itself.
+- Fit the deliverable type: e.g. reports need data collection, drafting, review and submission; systems need requirements, build, testing and deployment; trainings need materials, logistics, delivery and a training report.
+- days_before_due: whole days before the deliverable's due date each task should be done (0 = the due date itself, negative = after, e.g. a training report).
+- Suggest a role for each task, and an assignee only when one team member clearly fits by designation. Never invent names.
+- Do not repeat tasks that already exist (listed in the context). Keep titles short and specific to this deliverable.`;
   if (kind === "FINANCIAL")
     return `${common}
 Task: prepare the financial proposal (cost breakdown) for this bid.
@@ -48,7 +56,7 @@ Task: read this contract / purchase order and capture the deliverables with thei
 async function config(kind?: Kind): Promise<AiSettings & { apiKey: string }> {
   const stored = await getSetting("ai");
   // CVs and contracts can use the cheaper "quick reading" model; TORs and drafting use the main model
-  const useLight = (kind === "CV" || kind === "CONTRACT") && !!stored.lightModel && modelMatchesProvider(stored.provider, stored.lightModel);
+  const useLight = (kind === "CV" || kind === "CONTRACT" || kind === "WORKPLAN") && !!stored.lightModel && modelMatchesProvider(stored.provider, stored.lightModel);
   const ai = useLight ? { ...stored, model: stored.lightModel } : stored;
   if (!ai.enabled) throw new AiError("AI is switched off. An admin can enable it in Settings → AI.");
   const apiKey = decrypt(ai.apiKeyEnc);
@@ -104,7 +112,7 @@ async function runClaude<T>(cfg: Awaited<ReturnType<typeof config>>, kind: Kind,
       content.push({ type: "document", title: d.fileName, source: { type: "text", media_type: "text/plain", data: t } });
     }
   }
-  content.push({ type: "text", text: kind === "TENDER" ? "Extract the tender details." : kind === "CV" ? "Extract the CV details." : kind === "FINANCIAL" ? "Prepare the financial proposal." : "Extract the contract details." });
+  content.push({ type: "text", text: kind === "TENDER" ? "Extract the tender details." : kind === "CV" ? "Extract the CV details." : kind === "FINANCIAL" ? "Prepare the financial proposal." : kind === "WORKPLAN" ? "Propose the tasks for this deliverable." : "Extract the contract details." });
 
   const stream = client.beta.messages.stream({
     model: cfg.model,
@@ -201,6 +209,10 @@ export const extractCv = (docs: SourceDoc[]) => run<CvExtraction>("CV", docs, CV
 /** Cost breakdown from a text context bundle (TOR, team with rates, past financial proposals). */
 export const draftFinancialLines = (context: string) =>
   run<FinancialDraft>("FINANCIAL", [{ fileName: "bid-context.txt", mimeType: "text/plain", buffer: Buffer.from(context, "utf8") }], FINANCIAL_SCHEMA);
+
+/** Suggested tasks for one deliverable, from a text context bundle. Uses the quick-reading model. */
+export const draftWorkPlan = (context: string) =>
+  run<WorkPlan>("WORKPLAN", [{ fileName: "deliverable-context.txt", mimeType: "text/plain", buffer: Buffer.from(context, "utf8") }], WORKPLAN_SCHEMA);
 
 // ── Free-text drafting (proposal sections) ──
 export type DraftResult = { text: string; provider: string; model: string; cacheRead?: number; cacheWrite?: number; inputTokens?: number };

@@ -60,14 +60,14 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
           <button className="btn-dark btn-sm">Apply</button>
           {filtered && <Link href="/board" className="btn-ghost btn-sm">Clear</Link>}
         </form>
-        <div className="ml-auto">
-          {projects.length > 0 && (
-            <Disclosure label="+ New task or issue" className="btn-primary" panelClassName="mt-3 w-[min(56rem,90vw)]">
-              <WorkItemForm projects={projects} users={users} projectId={sp.project} deliverableId={sp.deliverable} />
-            </Disclosure>
-          )}
-        </div>
       </div>
+      {projects.length > 0 && (
+        <div className="mb-4">
+          <Disclosure label="+ New task or issue" className="btn-primary">
+            <WorkItemForm projects={projects} users={users} projectId={sp.project} deliverableId={sp.deliverable} />
+          </Disclosure>
+        </div>
+      )}
       {projects.length === 0
         ? <div className="card p-8 text-center text-sm text-ink-soft">No active projects yet.</div>
         : <KanbanBoard columns={columns.map((c) => ({ id: c.id, name: c.name, category: c.category, color: c.color }))} cards={cards} />}

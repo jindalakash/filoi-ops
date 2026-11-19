@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { guard, req, str, dateOf, FormError } from "@/lib/form";
 import { logActivity } from "@/lib/activity";
-import { canEditItem, canMoveItem, notifyWorkAssigned, workKey } from "@/lib/work";
+import { canEditItem, canMoveItem, notifyWorkAssigned, workKey, applyTemplateTo } from "@/lib/work";
+import { notifyUsers, mentionedUsers, commentHtml } from "@/lib/notify";
 import type { ActionState } from "@/components/client";
 import type { WorkPriority, WorkType } from "@prisma/client";
 
@@ -16,6 +17,7 @@ function refresh(projectId: string, number?: number) {
   revalidatePath("/deliverables");
   revalidatePath("/board");
   revalidatePath("/tasks");
+  revalidatePath("/issues");
   revalidatePath(`/projects/${projectId}`);
   if (number) revalidatePath(`/work/${number}`);
   revalidatePath("/", "layout"); // sidebar count
@@ -67,6 +69,12 @@ export async function saveWorkItem(_: ActionState, fd: FormData): Promise<Action
       type, priority,
       assigneeId: await activeUser(str(fd, "assigneeId")),
       dueDate: dateOf(fd, "dueDate") ?? null,
+      ...(type === "ISSUE" ? {
+        source: str(fd, "source") ?? null,
+        clientContact: str(fd, "clientContact") ?? null,
+        reportedAt: dateOf(fd, "reportedAt") ?? before?.reportedAt ?? new Date(),
+        respondBy: dateOf(fd, "respondBy") ?? null,
+      } : {}),
     };
     if (before) {
       const item = await db.workItem.update({ where: { id: before.id }, data });
@@ -98,11 +106,13 @@ async function applyStatus(userId: string, itemId: string, statusId: string, pos
       statusId,
       position: position ?? (changed ? await nextPosition(statusId) : item.position),
       ...(changed ? { completedAt: status.category === "DONE" ? new Date() : null } : {}),
+      ...(changed && status.category !== "TODO" && !item.respondedAt ? { respondedAt: new Date() } : {}),
     },
   });
   if (changed) {
     await db.workComment.create({ data: { itemId, userId, kind: "STATUS", body: `${item.status.name} → ${status.name}` } });
     await logActivity(userId, "status", "work", itemId, `${workKey(item.number)} → ${status.name}`);
+    await notifyUsers([item.reporterId, item.assigneeId], userId, { kind: "STATUS", title: `${workKey(item.number)} moved to ${status.name}`, body: item.title, href: `/work/${item.number}` });
   }
   return updated;
 }
@@ -136,10 +146,22 @@ export async function setWorkStatus(_: ActionState, fd: FormData): Promise<Actio
 export async function addWorkComment(_: ActionState, fd: FormData): Promise<ActionState> {
   const user = await requireUser();
   return guard(async () => {
-    const item = await db.workItem.findUniqueOrThrow({ where: { id: req(fd, "id") } });
-    await db.workComment.create({ data: { itemId: item.id, userId: user.id, body: req(fd, "body", "Comment") } });
+    const item = await db.workItem.findUniqueOrThrow({ where: { id: req(fd, "id") }, include: { project: { select: { code: true } }, comments: { where: { kind: "COMMENT" }, select: { userId: true } } } });
+    const body = req(fd, "body", "Comment");
+    await db.workComment.create({ data: { itemId: item.id, userId: user.id, body } });
+    if (item.type === "ISSUE" && !item.respondedAt) await db.workItem.update({ where: { id: item.id }, data: { respondedAt: new Date() } });
+    const href = `/work/${item.number}`;
+    const snippet = body.length > 140 ? `${body.slice(0, 140)}…` : body;
+    // @mentions: bell + email; everyone else involved: bell only
+    const mentioned = await mentionedUsers(body);
+    const ctx = `${item.project.code} · ${workKey(item.number)} ${item.title}`;
+    await notifyUsers(mentioned.map((m) => m.id), user.id, { kind: "MENTION", title: `${user.name} mentioned you on ${workKey(item.number)}`, body: snippet, href },
+      { dedupe: `work:${item.id}:MENTION`, subject: `[${item.project.code}] ${user.name} mentioned you: ${item.title}`, html: commentHtml(ctx, user.name, body) });
+    const mentionedIds = new Set(mentioned.map((m) => m.id));
+    const involved = [item.assigneeId, item.reporterId, ...item.comments.map((c) => c.userId)].filter((x) => x && !mentionedIds.has(x));
+    await notifyUsers(involved, user.id, { kind: "COMMENT", title: `${user.name} commented on ${workKey(item.number)}`, body: snippet, href });
     refresh(item.projectId, item.number);
-    return { ok: "Comment added." };
+    return { ok: mentioned.length ? `Comment added · notified ${mentioned.map((m) => m.name).join(", ")}.` : "Comment added." };
   });
 }
 
@@ -155,4 +177,43 @@ export async function deleteWorkItem(_: ActionState, fd: FormData): Promise<Acti
   });
   if (r && "ok" in r && r.ok && str(fd, "back")) redirect(str(fd, "back")!);
   return r;
+}
+
+/** A client issue that turns out to be planned work → make it a task (keeps history). */
+export async function convertToTask(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  return guard(async () => {
+    const item = await db.workItem.findUniqueOrThrow({ where: { id: req(fd, "id") } });
+    if (!canEditItem(user, item)) throw new FormError("Only admins, project managers or the person who logged it can convert it.");
+    await db.workItem.update({ where: { id: item.id }, data: { type: "TASK" } });
+    await db.workComment.create({ data: { itemId: item.id, userId: user.id, kind: "CONVERTED" } });
+    refresh(item.projectId, item.number);
+    revalidatePath("/issues");
+    return { ok: "Converted to a task — it now counts toward its deliverable's progress." };
+  });
+}
+
+/** Add template tasks to one deliverable. */
+export async function applyTemplate(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await requireUser("projects");
+  return guard(async () => {
+    const id = req(fd, "id");
+    const made = await applyTemplateTo(id, user.id);
+    const dl = await db.deliverable.findUniqueOrThrow({ where: { id }, select: { projectId: true } });
+    refresh(dl.projectId);
+    return made ? { ok: `Added ${made} task${made > 1 ? "s" : ""} from the template.` } : { error: "Nothing to add — no template for this deliverable type, or the tasks already exist." };
+  });
+}
+
+/** Add template tasks to every open deliverable of a project that has no tasks yet. */
+export async function applyTemplatesToProject(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await requireUser("projects");
+  return guard(async () => {
+    const projectId = req(fd, "projectId");
+    const dls = await db.deliverable.findMany({ where: { projectId, status: { not: "ACCEPTED" }, workItems: { none: {} } }, select: { id: true } });
+    let made = 0, dlTouched = 0;
+    for (const d of dls) { const n = await applyTemplateTo(d.id, user.id); made += n; if (n) dlTouched++; }
+    refresh(projectId);
+    return made ? { ok: `Added ${made} tasks to ${dlTouched} deliverable${dlTouched > 1 ? "s" : ""}.` } : { error: "Nothing to add — check the templates in Settings → Task templates." };
+  });
 }

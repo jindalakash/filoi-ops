@@ -37,7 +37,12 @@ export type ReminderSettings = {
   overdueDays: string; // "1,7,14"
   hour: number; // 24h
   digestEmails: string;
+  weeklyDigest?: boolean; // Monday summary of each person's open tasks
 };
+
+/** Task templates per deliverable type. daysBefore: days before the deliverable's due date (negative = after). */
+export type TemplateTask = { title: string; daysBefore: number };
+export type TaskTemplateSettings = { auto: boolean; types: Record<string, TemplateTask[]> };
 
 export type FxSettings = { USD: number; EUR: number; INR: number }; // value of 1 unit in INR
 
@@ -92,10 +97,21 @@ const DEFAULTS = {
     invoiceFooter: "Thank you for your business.",
   } as CompanySettings,
   smtp: { host: "", port: 587, secure: false, user: "", passwordEnc: "", fromName: "Filoi Ops", fromEmail: "" } as SmtpSettings,
-  reminders: { enabled: true, defaultDays: "5,2,0", overdueDays: "1,7,14", hour: 8, digestEmails: "" } as ReminderSettings,
+  reminders: { enabled: true, defaultDays: "5,2,0", overdueDays: "1,7,14", hour: 8, digestEmails: "", weeklyDigest: true } as ReminderSettings,
   fx: { USD: 84, EUR: 91, INR: 1 } as FxSettings,
   ai: { enabled: false, provider: "anthropic", model: "claude-opus-5-5", lightModel: "claude-sonnet-5-5", apiKeyEnc: "", baseUrl: "" } as AiSettings,
   backup: { enabled: true, hour: 2, keepDaily: 14, keepWeekly: 8, copyDir: "", lastRunAt: "", lastStatus: "", lastError: "", lastFile: "", lastSize: 0 } as BackupSettings,
+  taskTemplates: {
+    auto: true,
+    types: {
+      REPORT: [{ title: "Collect data & updates from the team", daysBefore: 7 }, { title: "Draft report", daysBefore: 4 }, { title: "Internal review", daysBefore: 2 }, { title: "Finalise & send to client", daysBefore: 0 }],
+      DOCUMENT: [{ title: "Outline & agree structure", daysBefore: 14 }, { title: "Write first draft", daysBefore: 7 }, { title: "Internal quality review", daysBefore: 4 }, { title: "Revise & format", daysBefore: 2 }, { title: "Submit to client", daysBefore: 0 }],
+      SYSTEM: [{ title: "Confirm requirements with client", daysBefore: 21 }, { title: "Build / configure", daysBefore: 10 }, { title: "Test (incl. client UAT)", daysBefore: 5 }, { title: "Deploy & hand over documentation", daysBefore: 0 }],
+      TRAINING: [{ title: "Agenda & training materials", daysBefore: 14 }, { title: "Logistics & invitations", daysBefore: 7 }, { title: "Deliver training", daysBefore: 0 }, { title: "Training report & attendance", daysBefore: -5 }],
+      DATA: [{ title: "Collect data", daysBefore: 14 }, { title: "Clean & validate", daysBefore: 7 }, { title: "Document & submit dataset", daysBefore: 0 }],
+      OTHER: [],
+    },
+  } as TaskTemplateSettings,
   cashflow: { openingBalance: 0, openingDate: "", paymentDelayDays: 30, monthlyCosts: [] } as CashflowSettings,
 };
 

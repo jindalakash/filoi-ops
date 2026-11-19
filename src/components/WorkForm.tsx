@@ -5,10 +5,13 @@ import { saveWorkItem } from "@/app/actions/work";
 
 type Opt = { id: string; name: string };
 export type ProjectOpt = { id: string; code: string; deliverables: { id: string; title: string }[] };
-export type WorkItemEdit = { id: string; projectId: string; deliverableId: string | null; type: string; title: string; description: string | null; priority: string; assigneeId: string | null; dueDate: string };
+export type WorkItemEdit = { id: string; projectId: string; deliverableId: string | null; type: string; title: string; description: string | null; priority: string; assigneeId: string | null; dueDate: string; source?: string | null; clientContact?: string | null; reportedAt?: string; respondBy?: string };
 
 const TYPES = [["TASK", "Task"], ["ISSUE", "Client issue"], ["CHANGE", "Change request"]];
 const PRIORITIES = [["URGENT", "Urgent"], ["HIGH", "High"], ["MEDIUM", "Medium"], ["LOW", "Low"]];
+const SOURCES = [["EMAIL", "Email"], ["CALL", "Phone call"], ["MEETING", "Meeting"], ["PORTAL", "Client portal / system"], ["OTHER", "Other"]];
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const plusDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d); };
 
 /**
  * New / edit task or issue.
@@ -19,6 +22,9 @@ export function WorkItemForm({ projects, users, item, projectId, deliverableId, 
 }) {
   const [pid, setPid] = useState(item?.projectId ?? projectId ?? projects[0]?.id ?? "");
   const [did, setDid] = useState(item?.deliverableId ?? deliverableId ?? "");
+  const [kind, setKind] = useState(item?.type ?? type ?? "TASK");
+  const issue = kind === "ISSUE";
+  const [defaults] = useState(() => ({ today: plusDays(0), respond: plusDays(2) }));
   const project = projects.find((p) => p.id === pid);
   const fixedProject = !!(item || projectId);
 
@@ -53,15 +59,28 @@ export function WorkItemForm({ projects, users, item, projectId, deliverableId, 
             {project?.deliverables.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
           </select></label>
         <label className="block"><span className="label">Type</span>
-          <select name="type" defaultValue={item?.type ?? type ?? "TASK"} className="input">{TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-        <label className="block"><span className="label">Priority</span>
+          <select name="type" value={kind} onChange={(e) => setKind(e.target.value)} className="input">{TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+        <label className="block"><span className="label">{issue ? "Severity" : "Priority"}</span>
           <select name="priority" defaultValue={item?.priority ?? "MEDIUM"} className="input">{PRIORITIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
         <label className="block sm:col-span-2"><span className="label">Description</span>
           <textarea name="description" rows={3} defaultValue={item?.description ?? ""} className="input" placeholder="Details, acceptance criteria, links…" /></label>
         <label className="block"><span className="label">Assignee</span>
           <select name="assigneeId" defaultValue={item?.assigneeId ?? ""} className="input"><option value="">— Unassigned —</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
-        <label className="block"><span className="label">Due date</span>
+        <label className="block"><span className="label">{issue ? "Fix by" : "Due date"}</span>
           <input type="date" name="dueDate" defaultValue={item?.dueDate ?? ""} className="input" /></label>
+        {issue && (
+          <>
+            <div className="-mb-1 mt-1 text-xs font-semibold text-plum sm:col-span-2 lg:col-span-4">Reported by the client</div>
+            <label className="block"><span className="label">Reported by</span>
+              <input name="clientContact" defaultValue={item?.clientContact ?? ""} className="input" placeholder="e.g. Dr Ana Ruiz, PAHO" /></label>
+            <label className="block"><span className="label">How</span>
+              <select name="source" defaultValue={item?.source ?? "EMAIL"} className="input">{SOURCES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            <label className="block"><span className="label">Reported on</span>
+              <input type="date" name="reportedAt" defaultValue={item?.reportedAt ?? defaults.today} className="input" /></label>
+            <label className="block"><span className="label">Respond by</span>
+              <input type="date" name="respondBy" defaultValue={item?.respondBy ?? (item ? "" : defaults.respond)} className="input" /></label>
+          </>
+        )}
       </div>
       <div className="mt-3 flex justify-end"><SubmitButton className="btn-dark btn-sm">{item ? "Save" : "Create"}</SubmitButton></div>
     </ActionForm>

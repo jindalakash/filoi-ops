@@ -7,6 +7,8 @@ import { can } from "@/lib/permissions";
 import { guard, req, str, FormError } from "@/lib/form";
 import { saveUpload, readStored, deleteStored } from "@/lib/files";
 import { logActivity } from "@/lib/activity";
+import { getSetting } from "@/lib/settings";
+import { applyTemplateTo } from "@/lib/work";
 import { extractTender, extractContract, AiError } from "@/lib/ai/run";
 import type { SourceDoc } from "@/lib/ai/text";
 import type { ActionState } from "@/components/client";
@@ -114,6 +116,7 @@ export async function applyContract(_: ActionState, fd: FormData): Promise<Actio
     const dlIds = new Map<string, string>();
     let seq = await db.deliverable.count({ where: { projectId } });
     let dlMade = 0;
+    const autoTasks = (await getSetting("taskTemplates")).auto;
     for (let i = 0; i < dlCount; i++) {
       if (!fd.get(`dl_include_${i}`)) continue;
       const title = str(fd, `dl_title_${i}`);
@@ -122,6 +125,7 @@ export async function applyContract(_: ActionState, fd: FormData): Promise<Actio
         data: { projectId, seq: ++seq, title, description: str(fd, `dl_desc_${i}`), type: (str(fd, `dl_type_${i}`) || "DOCUMENT") as DeliverableType, dueDate: d(`dl_due_${i}`) },
       });
       dlIds.set(`new:${i}`, dl.id);
+      if (autoTasks) await applyTemplateTo(dl.id, user.id);
       dlMade++;
     }
 

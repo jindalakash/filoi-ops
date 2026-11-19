@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { can } from "./permissions";
 import { sendOnce, emailShell } from "./email";
+import { notifyEmails } from "./notify";
 import { date, splitEmails } from "./format";
 import type { Role } from "@prisma/client";
 
@@ -43,6 +44,7 @@ export async function notifyTask(taskId: string, event: Event, actorId: string, 
     const actor = await db.user.findUnique({ where: { id: actorId }, select: { email: true } });
     const to = [...new Set(m.to.filter((e): e is string => !!e && e !== actor?.email))];
     if (!to.length) return;
+    await notifyEmails(to, actorId, { kind: "PROPOSAL", title: m.subject.replace(/^\[[^\]]+\]\s*/, ""), body: `${o.code} · ${o.title}`, href: event === "ALL_APPROVED" ? `/opportunities/${o.id}` : `/tasks/${t.id}` });
     await sendOnce(`task:${t.id}:${event}:${Date.now()}`, "task", to, m.subject, emailShell(m.subject.replace(/^\[[^\]]+\]\s*/, ""), ctx + m.body, event === "ALL_APPROVED" ? { href: `${appUrl()}/opportunities/${o.id}`, label: "Open proposal" } : link));
   } catch (e) {
     console.error("[tasks] notify failed", e);
@@ -60,6 +62,7 @@ export async function notifyAssignedMany(taskIds: string[], actorId: string) {
     const list = tasks.map((t) => `<li><a href="${appUrl()}/tasks/${t.id}">${t.title.replace(/</g, "&lt;")}</a>${t.dueDate ? ` — due ${date(t.dueDate)}` : ""}</li>`).join("");
     const subject = `[${o.code}] You've been assigned ${tasks.length} parts`;
     const body = `<p style="color:#4a5878;font-size:13px">${o.code} · ${o.title} (${o.client.shortName || o.client.name})</p><p>You have been assigned:</p><ul>${list}</ul>${first.description ? `<p>${first.description.replace(/</g, "&lt;")}</p>` : ""}`;
+    await notifyEmails([first.assignee.email], actorId, { kind: "PROPOSAL", title: subject.replace(/^\[[^\]]+\]\s*/, ""), body: tasks.map((t) => t.title).join(", "), href: "/tasks" });
     await sendOnce(`tasks:${taskIds.join(",").slice(0, 120)}:ASSIGNED:${Date.now()}`, "task", [first.assignee.email], subject, emailShell(`${tasks.length} parts assigned to you`, body, { href: `${appUrl()}/tasks`, label: "Open my tasks" }));
   } catch (e) {
     console.error("[tasks] notify failed", e);

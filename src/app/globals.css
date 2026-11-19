@@ -2,6 +2,8 @@
 
 /* Dark mode follows <html data-theme="dark"> (set before first paint by the script in layout.tsx). */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+/* collapsed sidebar (icon rail), desktop only — set on <html> before first paint */
+@custom-variant rail (&:where([data-rail="1"], [data-rail="1"] *));
 
 /* Theme-dependent tokens. A nested data-theme="light" (e.g. printed invoices) resets them. */
 :root, [data-theme=light] {

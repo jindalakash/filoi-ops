@@ -6,10 +6,10 @@ import { PageHeader, Card, KV } from "@/components/ui";
 import { Badge, DueDate } from "@/components/badges";
 import { ActionForm, SubmitButton, AutoSelect, ConfirmAction, Disclosure } from "@/components/client";
 import { Documents } from "@/components/Documents";
-import { StatusPill } from "@/components/WorkParts";
+import { StatusPill, ResponseState } from "@/components/WorkParts";
 import { WorkItemForm } from "@/components/WorkForm";
-import { addWorkComment, deleteWorkItem, setWorkStatus } from "@/app/actions/work";
-import { boardColumns, canEditItem, canMoveItem, workKey, WORK_TYPE, WORK_PRIORITY } from "@/lib/work";
+import { addWorkComment, deleteWorkItem, setWorkStatus, convertToTask } from "@/app/actions/work";
+import { boardColumns, canEditItem, canMoveItem, workKey, WORK_TYPE, WORK_PRIORITY, ISSUE_SOURCES } from "@/lib/work";
 import { date, inputDate } from "@/lib/format";
 
 export async function generateMetadata({ params }: PageProps<"/work/[number]">) {
@@ -34,16 +34,19 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
   if (!i) notFound();
   const [columns, users, projects] = await Promise.all([
     boardColumns(),
-    db.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    db.user.findMany({ where: { active: true }, select: { id: true, name: true, username: true }, orderBy: { name: "asc" } }),
     db.project.findMany({ where: { id: i.projectId }, select: { id: true, code: true, deliverables: { select: { id: true, title: true }, orderBy: { seq: "asc" } } } }),
   ]);
   const userName = new Map(users.map((u) => [u.id, u.name]));
   const edit = canEditItem(user, i), move = canMoveItem(user, i);
   const EVENT: Record<string, (b: string | null) => string> = {
-    CREATED: () => "created this",
+    CREATED: (b) => (b === "template" ? "added this from the task template" : b === "ai" ? "added this from the AI work plan" : "created this"),
     STATUS: (b) => `moved it: ${b ?? ""}`,
     ASSIGNED: (b) => `assigned it to ${(b && userName.get(b)) || "someone"}`,
+    CONVERTED: () => "converted this client issue into a task",
   };
+  const issue = i.type === "ISSUE";
+  const SRC = Object.fromEntries(ISSUE_SOURCES);
 
   return (
     <>
@@ -61,7 +64,7 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
               <div className="mt-4 border-t border-line pt-4">
                 <Disclosure label="Edit details" className="btn-ghost btn-sm">
                   <WorkItemForm projects={projects} users={users}
-                    item={{ id: i.id, projectId: i.projectId, deliverableId: i.deliverableId, type: i.type, title: i.title, description: i.description, priority: i.priority, assigneeId: i.assigneeId, dueDate: inputDate(i.dueDate) }} />
+                    item={{ id: i.id, projectId: i.projectId, deliverableId: i.deliverableId, type: i.type, title: i.title, description: i.description, priority: i.priority, assigneeId: i.assigneeId, dueDate: inputDate(i.dueDate), source: i.source, clientContact: i.clientContact, reportedAt: inputDate(i.reportedAt), respondBy: inputDate(i.respondBy) }} />
                 </Disclosure>
               </div>
             )}
@@ -87,9 +90,10 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
             </ol>
             <ActionForm action={addWorkComment} resetOnOk className="mt-5 flex items-end gap-2 border-t border-line pt-4">
               <input type="hidden" name="id" value={i.id} />
-              <textarea name="body" rows={2} required className="input flex-1" placeholder="Write a comment…" />
+              <textarea name="body" rows={2} required className="input flex-1" placeholder="Write a comment… type @username to notify someone" />
               <SubmitButton className="btn-dark btn-sm">Post</SubmitButton>
             </ActionForm>
+            <p className="mt-1.5 text-xs text-ink-soft">Mention: {users.map((u) => `@${u.username}`).join("  ")}</p>
           </Card>
         </div>
 
@@ -101,15 +105,25 @@ export default async function WorkItemPage({ params }: PageProps<"/work/[number]
             <div className="mt-4">
               <KV items={[
                 ["Type", <Badge key="t" tone={WORK_TYPE[i.type].tone}>{WORK_TYPE[i.type].label}</Badge>],
-                ["Priority", <Badge key="p" tone={WORK_PRIORITY[i.priority].tone}>{WORK_PRIORITY[i.priority].label}</Badge>],
+                [issue ? "Severity" : "Priority", <Badge key="p" tone={WORK_PRIORITY[i.priority].tone}>{WORK_PRIORITY[i.priority].label}</Badge>],
                 ["Assignee", i.assignee?.name ?? "Unassigned"],
-                ["Due", <DueDate key="d" value={i.dueDate} done={i.status.category === "DONE"} />],
+                ...(issue ? [
+                  ["Reported", `${i.reportedAt ? date(i.reportedAt) : "—"}${i.clientContact ? ` · ${i.clientContact}` : ""}${i.source ? ` · ${SRC[i.source] ?? i.source}` : ""}`],
+                  ["Response", <ResponseState key="r" respondBy={i.respondBy} respondedAt={i.respondedAt} />],
+                ] as [string, React.ReactNode][] : []),
+                [issue ? "Fix by" : "Due", <DueDate key="d" value={i.dueDate} done={i.status.category === "DONE"} />],
                 ["Project", `${i.project.code} · ${i.project.client.shortName || i.project.client.name}`],
                 ["Deliverable", i.deliverable?.title ?? "—"],
                 ["Created by", `${i.reporter?.name ?? "—"} · ${date(i.createdAt)}`],
                 ...(i.completedAt ? [["Completed", date(i.completedAt)] as [string, string]] : []),
               ]} />
             </div>
+            {issue && edit && (
+              <div className="mt-4 border-t border-line pt-4">
+                <ConfirmAction action={convertToTask} fields={{ id: i.id }} label="Convert to task" confirm="Make this a normal task? It will then count toward its deliverable's progress." className="btn-ghost btn-sm w-full" />
+                <p className="mt-1.5 text-xs text-ink-soft">For issues that turn out to be planned work.</p>
+              </div>
+            )}
           </Card>
         </div>
       </div>

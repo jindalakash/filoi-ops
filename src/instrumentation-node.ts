@@ -10,8 +10,9 @@ if (!g.__filoiCron && process.env.DISABLE_CRON !== "1") {
       const { getSetting } = await import("./lib/settings");
       const cfg = await getSetting("reminders");
       if (new Date().getHours() !== Number(cfg.hour ?? 8)) return;
-      const { runReminders } = await import("./lib/reminders");
+      const { runReminders, runWeeklyDigest } = await import("./lib/reminders");
       await runReminders();
+      if (new Date().getDay() === 1) await runWeeklyDigest(); // Mondays
     } catch (e) {
       console.error("[reminders] failed", e);
     }

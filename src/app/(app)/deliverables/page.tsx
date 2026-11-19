@@ -11,16 +11,31 @@ import { ProgressLine, ProgressBar, deliverablePct } from "@/components/Delivera
 import { WorkRow, workRowInclude } from "@/components/WorkParts";
 import { WorkItemForm } from "@/components/WorkForm";
 import { boardColumns, canMoveItem } from "@/lib/work";
-import { KanbanSquare } from "lucide-react";
+import { KanbanSquare, Sparkles } from "lucide-react";
+import { CollapsibleGroup, CollapseAllButtons } from "@/components/CollapsibleGroup";
+import { ActionForm, SubmitButton } from "@/components/client";
+import { Notice } from "@/components/ui";
+import { applyTemplate, applyTemplatesToProject } from "@/app/actions/work";
+import { aiSplitDeliverable } from "@/app/actions/workplan";
+import { getSetting } from "@/lib/settings";
+import { aiReady } from "@/lib/ai/run";
 
 export const metadata = { title: "Delivery" };
 
-export default async function DeliveryPage({ searchParams }: { searchParams: Promise<{ v?: string; mine?: string }> }) {
+export default async function DeliveryPage({ searchParams }: { searchParams: Promise<{ v?: string; mine?: string; added?: string }> }) {
   const user = await requireUser();
-  const { v = "open", mine } = await searchParams;
+  const { v = "open", mine, added } = await searchParams;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const in30 = new Date(today.getTime() + 30 * 86400000);
 
+  const edit = can(user.role, "projects");
+  const [tpl, ai, plans] = await Promise.all([
+    getSetting("taskTemplates"),
+    edit ? aiReady() : Promise.resolve(false),
+    edit ? db.aiExtraction.findMany({ where: { kind: "WORKPLAN", status: "READY" }, select: { id: true, result: true } }) : Promise.resolve([]),
+  ]);
+  const planFor = new Map(plans.map((x) => [(x.result as { deliverableId?: string }).deliverableId, x.id]));
+  const tplCount = (type: string) => (tpl.types[type] ?? []).length;
   const [projects, columns, users] = await Promise.all([
     db.project.findMany({
       where: { status: "ACTIVE" },
@@ -28,6 +43,7 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
         id: true, code: true, title: true, managerId: true, client: { select: { name: true, shortName: true } },
         deliverables: { include: { owner: { select: { name: true } }, workItems: { include: workRowInclude, orderBy: [{ position: "asc" }] } }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { seq: "asc" }] },
         workItems: { where: { deliverableId: null }, include: workRowInclude, orderBy: [{ position: "asc" }] },
+        _count: { select: { workItems: { where: { type: "ISSUE", status: { category: { not: "DONE" } } } } } },
       },
       orderBy: { endDate: { sort: "asc", nulls: "last" } },
     }),
@@ -50,7 +66,6 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
     .filter((g) => !mine || g.p.managerId === user.id || g.rows.length > 0 || isMine(g.p));
 
   const views = [["open", "All open"], ["upcoming", "Next 30 days"], ["overdue", "Overdue"], ["all", "Everything"]];
-  const edit = can(user.role, "projects");
   const q = (k: string, m?: string) => `/deliverables?v=${k}${m ? "&mine=1" : ""}`;
   const projectOpts = projects.map((p) => ({ id: p.id, code: p.code, deliverables: p.deliverables.map((d) => ({ id: d.id, title: d.title })) }));
   const colOpts = columns.map((c) => ({ id: c.id, name: c.name, category: c.category, color: c.color }));
@@ -61,10 +76,11 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
       <PageHeader title="Delivery" subtitle="Deliverables by project, the tasks under each, and what's left."
         actions={<Link href="/board" className="btn-ghost"><KanbanSquare size={16} /> Board</Link>} />
 
+      {added && <div className="mb-4"><Notice tone="ok">Added {added} task{added === "1" ? "" : "s"} from the AI work plan.</Notice></div>}
       {projects.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-start gap-3">
-          {projects.length > 1 && <Card className="min-w-72 flex-1"><ProgressLine rows={allRows} label="All active projects" sub={`${projects.length} projects · ${allRows.length} deliverables`} big /></Card>}
-          <Disclosure label="+ New task or issue" className="btn-primary" panelClassName="mt-3 w-full basis-full">
+        <div className="mb-4 space-y-4">
+          {projects.length > 1 && <Card><ProgressLine rows={allRows} label="All active projects" sub={`${projects.length} projects · ${allRows.length} deliverables`} big /></Card>}
+          <Disclosure label="+ New task or issue" className="btn-primary">
             <WorkItemForm projects={projectOpts} users={users} />
           </Disclosure>
         </div>
@@ -72,16 +88,31 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {views.map(([k, l]) => <Link key={k} href={q(k, mine)} className={clsx("rounded-full border px-3 py-1.5 text-sm font-semibold", v === k ? "border-navy bg-navy text-white" : "border-line bg-surface text-ink-soft hover:text-ink")}>{l}</Link>)}
-        <Link href={q(v, mine ? undefined : "1")} className={clsx("ml-auto rounded-full border px-3 py-1.5 text-sm font-semibold", mine ? "border-plum bg-plum text-white" : "border-line bg-surface text-ink-soft")}>{mine ? "✓ " : ""}Only mine</Link>
+        {groups.length > 1 && <span className="ml-auto"><CollapseAllButtons scope="delivery" ids={groups.map((g) => g.p.id)} /></span>}
+        <Link href={q(v, mine ? undefined : "1")} className={clsx(groups.length > 1 ? "" : "ml-auto", "rounded-full border px-3 py-1.5 text-sm font-semibold", mine ? "border-plum bg-plum text-white" : "border-line bg-surface text-ink-soft")}>{mine ? "✓ " : ""}Only mine</Link>
       </div>
 
       {groups.length === 0 ? <Card><Empty title="No active projects">{mine ? "Nothing assigned to you." : "Active projects and their deliverables show here."}</Empty></Card> : (
         <div className="space-y-5">
           {groups.map(({ p, rows }) => (
-            <Card key={p.id} pad={false}
+            <CollapsibleGroup key={p.id} scope="delivery" id={p.id}
               title={<span className="flex flex-wrap items-baseline gap-x-2"><Link href={`/projects/${p.id}?tab=deliverables`} className="link">{p.code}</Link><span className="text-sm font-normal text-ink-soft">{p.client.shortName || p.client.name} · {p.title}</span></span>}
-              actions={<Link href={`/board?project=${p.id}`} className="btn-ghost btn-sm shrink-0">Board</Link>}>
-              <div className="border-b border-line px-5 py-4"><ProgressLine rows={p.deliverables} big /></div>
+              actions={<span className="flex shrink-0 items-center gap-2">
+                {(() => { const n = p._count.workItems; return n > 0 && <Link href={`/issues?project=${p.id}`} className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200 hover:underline">{n} open client issue{n > 1 ? "s" : ""}</Link>; })()}
+                <Link href={`/board?project=${p.id}`} className="btn-ghost btn-sm">Board</Link>
+              </span>}
+              summary={<ProgressLine rows={p.deliverables} big />}>
+              {(() => {
+                  const n = edit ? p.deliverables.filter((d) => d.status !== "ACCEPTED" && d.workItems.length === 0 && tplCount(d.type) > 0).length : 0;
+                  return n > 0 && (
+                    <ActionForm action={applyTemplatesToProject} className="mx-5 my-3 flex flex-wrap items-center gap-2 rounded-lg bg-mist/60 px-3 py-2 text-xs text-ink-soft">
+                      <input type="hidden" name="projectId" value={p.id} />
+                      <span>{n} open deliverable{n > 1 ? "s have" : " has"} no tasks yet.</span>
+                      <SubmitButton className="btn-ghost btn-sm" pendingText="Adding…">Add template tasks to all {n}</SubmitButton>
+                      <a href="/settings?tab=templates" className="link">Edit templates</a>
+                    </ActionForm>
+                  );
+                })()}
               {rows.length === 0 ? <div className="px-5 py-4 text-sm text-ink-soft">No deliverables in this view.</div> : (
                 <ul className="divide-y divide-line">
                   {rows.map((d) => {
@@ -117,6 +148,18 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
                               </ul>
                             )}
                             <div className="py-2"><WorkItemForm compact projects={projectOpts} users={users} projectId={p.id} deliverableId={d.id} /></div>
+                            {edit && (
+                              <div className="flex flex-wrap items-center gap-2 border-t border-line/70 py-2 text-xs">
+                                {planFor.get(d.id) ? (
+                                  <Link href={`/deliverables/plan/${planFor.get(d.id)}`} className="inline-flex items-center gap-1.5 rounded-lg bg-plum/10 px-2.5 py-1.5 font-semibold text-plum hover:bg-plum/15"><Sparkles size={13} /> AI plan waiting — review →</Link>
+                                ) : ai && (
+                                  <ActionForm action={aiSplitDeliverable}><input type="hidden" name="id" value={d.id} /><SubmitButton className="btn-ghost btn-sm" pendingText="AI is planning…"><Sparkles size={13} className="text-plum" /> Split into tasks with AI</SubmitButton></ActionForm>
+                                )}
+                                {tplCount(d.type) > 0 && (
+                                  <ActionForm action={applyTemplate}><input type="hidden" name="id" value={d.id} /><SubmitButton className="btn-ghost btn-sm" pendingText="Adding…">Add template tasks ({tplCount(d.type)})</SubmitButton></ActionForm>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </details>
                       </li>
@@ -132,7 +175,7 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
                   </ul>
                 </details>
               )}
-            </Card>
+            </CollapsibleGroup>
           ))}
         </div>
       )}

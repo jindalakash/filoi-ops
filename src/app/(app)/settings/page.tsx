@@ -9,16 +9,17 @@ import { saveCompany, saveFx, saveSmtp, sendTestEmail, saveReminders, runReminde
 import { listBackups, BACKUP_DIR } from "@/lib/backup";
 import { Download } from "lucide-react";
 import { AiSettingsForm } from "@/components/AiSettingsForm";
+import { TemplateEditor } from "@/components/TemplateEditor";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const user = await requireUser("admin");
   const { tab = "company" } = await searchParams;
-  const [company, smtp, rem, fx, ai, bk] = await Promise.all([getSetting("company"), getSetting("smtp"), getSetting("reminders"), getSetting("fx"), getSetting("ai"), getSetting("backup")]);
+  const [company, smtp, rem, fx, ai, bk, tpl] = await Promise.all([getSetting("company"), getSetting("smtp"), getSetting("reminders"), getSetting("fx"), getSetting("ai"), getSetting("backup"), getSetting("taskTemplates")]);
   const backups = tab === "backups" ? await listBackups() : [];
   const logs = tab === "reminders" ? await db.notificationLog.findMany({ orderBy: { createdAt: "desc" }, take: 25 }) : [];
-  const tabs = [["company", "Company & GST"], ["email", "Email"], ["reminders", "Reminders"], ["currency", "Currencies"], ["ai", "AI (beta)"], ["backups", "Backups"]].map(([key, label]) => ({ key, label, href: `?tab=${key}` }));
+  const tabs = [["company", "Company & GST"], ["email", "Email"], ["reminders", "Reminders"], ["templates", "Task templates"], ["currency", "Currencies"], ["ai", "AI (beta)"], ["backups", "Backups"]].map(([key, label]) => ({ key, label, href: `?tab=${key}` }));
 
   return (
     <>
@@ -88,6 +89,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               <Field label="Days before due date" hint="Default for new projects. Each project can override."><input name="defaultDays" defaultValue={rem.defaultDays} className="input" /></Field>
               <Field label="Days after (overdue)"><input name="overdueDays" defaultValue={rem.overdueDays} className="input" /></Field>
               <Field label="Send at hour (0–23, server time)"><input name="hour" type="number" min={0} max={23} defaultValue={rem.hour} className="input" /></Field>
+              <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="weeklyDigest" defaultChecked={rem.weeklyDigest !== false} className="mt-0.5 h-4 w-4 accent-plum" /> <span><b>Monday digest</b> — email each person their overdue tasks and what&apos;s due this week</span></label>
               <Field label="Always copy (finance) emails" hint="Gets invoicing & payment reminders for every project."><input name="digestEmails" defaultValue={rem.digestEmails} className="input" /></Field>
               <SubmitButton className="btn-primary w-full">Save</SubmitButton>
             </ActionForm>
@@ -115,6 +117,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             )}
           </Card>
         </div>
+      )}
+
+      {tab === "templates" && (
+        <Card title="Standard tasks per deliverable type" className="max-w-6xl">
+          <p className="mb-4 text-sm text-ink-soft">Each deliverable of a type gets these tasks, due a set number of days before the deliverable. You can also add them later from <b>Delivery</b> (“Add template tasks”).</p>
+          <TemplateEditor value={tpl} />
+        </Card>
       )}
 
       {tab === "currency" && (

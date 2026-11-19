@@ -141,6 +141,65 @@ export async function runReminders() {
     tally(await sendOnce(`task:${t.id}:${date(t.dueDate)}:${t.status}:${tr.tag}`, "task", [who.email], subject, html));
   }
 
+  // 6. Delivery tasks & client issues → the assignee (or whoever logged it), by email and in the bell
+  const work = await db.workItem.findMany({
+    where: { status: { category: { not: "DONE" } }, dueDate: { not: null }, project: { status: "ACTIVE" } },
+    include: { assignee: true, reporter: true, project: true, deliverable: true },
+  });
+  for (const w of work) {
+    summary.checked++;
+    const tr = trigger(w.dueDate, [1, 0], after);
+    if (!tr) continue;
+    const who = w.assignee?.active ? w.assignee : w.reporter;
+    if (!who?.email) continue;
+    const key = `W-${w.number}`;
+    const what = w.type === "ISSUE" ? "Client issue" : "Task";
+    const title = `${key} ${tr.d < 0 ? "overdue" : tr.d === 0 ? "due today" : "due tomorrow"}: ${w.title}`;
+    const subject = `[${w.project.code}] ${what} ${title}`;
+    const html = emailShell(
+      tr.d < 0 ? `${what} overdue` : `${what} reminder`,
+      `<p><b>${w.title}</b> (${key}) for <b>${w.project.title}</b>${w.deliverable ? ` · ${w.deliverable.title}` : ""} ${whenText(tr.d)} — due ${date(w.dueDate)}.</p>${w.assignee ? "" : "<p>It has no assignee yet.</p>"}`,
+      { href: `${APP_URL()}/work/${w.number}`, label: "Open task" },
+    );
+    const r = await sendOnce(`work:${w.id}:${date(w.dueDate)}:${tr.tag}`, "work", [who.email], subject, html);
+    const seen = await db.notification.findFirst({ where: { userId: who.id, kind: "DUE", title }, select: { id: true } });
+    if (!seen) await db.notification.create({ data: { userId: who.id, kind: "DUE", title, body: w.project.code, href: `/work/${w.number}` } });
+    tally(r);
+  }
+
   console.log("[reminders]", summary);
   return summary;
+}
+
+/** Monday: one email per person — overdue, due this week, and everything else open. */
+export async function runWeeklyDigest() {
+  const cfg = await getSetting("reminders");
+  if (!cfg.enabled || cfg.weeklyDigest === false) return { sent: 0 };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekTag = today.toISOString().slice(0, 10);
+  const users = await db.user.findMany({ where: { active: true } });
+  let sent = 0;
+  for (const u of users) {
+    const [work, parts] = await Promise.all([
+      db.workItem.findMany({ where: { assigneeId: u.id, status: { category: { not: "DONE" } }, project: { status: "ACTIVE" } }, include: { project: true }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }] }),
+      db.proposalTask.findMany({ where: { assigneeId: u.id, status: { in: ["TODO", "IN_PROGRESS", "CHANGES_REQUESTED"] }, opportunity: { status: { in: ["DRAFT", "IN_REVIEW", "READY_TO_SUBMIT"] } } }, include: { opportunity: true }, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }] }),
+    ]);
+    const rows = [
+      ...work.map((w) => ({ due: w.dueDate, label: `W-${w.number} ${w.title}`, ctx: w.project.code, href: `${APP_URL()}/work/${w.number}` })),
+      ...parts.map((t) => ({ due: t.dueDate, label: t.title, ctx: `${t.opportunity.code} (proposal)`, href: `${APP_URL()}/tasks/${t.id}` })),
+    ];
+    if (!rows.length || !u.email) continue;
+    const overdue = rows.filter((r) => r.due && r.due < today);
+    const thisWeek = rows.filter((r) => r.due && r.due >= today && r.due < weekEnd);
+    const later = rows.filter((r) => !r.due || r.due >= weekEnd);
+    const esc = (x: string) => x.replace(/</g, "&lt;");
+    const list = (title: string, xs: typeof rows, colour = "#0f2550") => xs.length ? `<h3 style="font-size:14px;margin:18px 0 6px;color:${colour}">${title} (${xs.length})</h3><ul style="padding-left:18px;margin:0">${xs.slice(0, 25).map((r) => `<li style="margin:3px 0"><a href="${r.href}">${esc(r.label)}</a> <span style="color:#4a5878">· ${r.ctx}${r.due ? ` · ${date(r.due)}` : ""}</span></li>`).join("")}</ul>${xs.length > 25 ? `<p style="color:#4a5878">…and ${xs.length - 25} more</p>` : ""}` : "";
+    const body = `<p>Good morning ${esc(u.name.split(" ")[0])}, here's your week.</p>${list("Overdue", overdue, "#b42318")}${list("Due this week", thisWeek)}${list("Other open work", later)}`;
+    const subject = `Your week: ${overdue.length ? `${overdue.length} overdue, ` : ""}${thisWeek.length} due this week`;
+    const r = await sendOnce(`digest:${u.id}:${weekTag}`, "digest", [u.email], subject, emailShell("Your week at Filoi", body, { href: `${APP_URL()}/tasks`, label: "Open my tasks" }));
+    if (r?.status === "SENT") sent++;
+  }
+  console.log("[digest]", { sent });
+  return { sent };
 }

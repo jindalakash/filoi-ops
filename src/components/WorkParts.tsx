@@ -4,6 +4,7 @@ import { Badge, DueDate } from "./badges";
 import { AutoSelect } from "./client";
 import { setWorkStatus } from "@/app/actions/work";
 import { WORK_TYPE, WORK_PRIORITY, workKey } from "@/lib/work";
+import { date, daysUntil } from "@/lib/format";
 
 type Tone = "gray" | "blue" | "purple" | "amber" | "green" | "red" | "navy";
 export type Column = { id: string; name: string; category: string; color: string };
@@ -56,3 +57,12 @@ export const workRowInclude = {
   status: { select: { name: true, category: true, color: true } },
   assignee: { select: { name: true } },
 } as const;
+
+/** Response state of a client issue: responded, overdue, or due. */
+export function ResponseState({ respondBy, respondedAt }: { respondBy: Date | null; respondedAt: Date | null }) {
+  if (respondedAt) return <span className="text-xs text-emerald-700">Responded {date(respondedAt)}</span>;
+  if (!respondBy) return <span className="text-xs text-ink-soft">No response target</span>;
+  const d = daysUntil(respondBy)!;
+  return <span className={clsx("text-xs", d < 0 ? "font-semibold text-red-700" : d <= 1 ? "text-amber-700" : "text-ink-soft")}>{d < 0 ? `Response ${-d}d overdue` : d === 0 ? "Respond today" : `Respond by ${date(respondBy)}`}</span>;
+}
+

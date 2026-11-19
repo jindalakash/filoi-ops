@@ -186,3 +186,33 @@ export type FinancialDraft = {
   lines: { category: "FEES" | "TRAVEL" | "PER_DIEM" | "OTHER"; description: string; expert_name: string | null; unit: string; quantity: number; rate: number; basis: string | null }[];
   notes: string | null;
 };
+
+/** Deliverable → suggested tasks */
+export const WORKPLAN_SCHEMA = {
+  type: "object",
+  properties: {
+    tasks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short imperative task title, max ~8 words" },
+          description: { type: "string", description: "What done looks like, 1–2 sentences; \"\" if obvious" },
+          days_before_due: { type: "integer", description: "Days before the deliverable's due date the task should finish (negative = after)" },
+          role: { type: "string", description: "Who should do it, e.g. Team leader, DHIS2 specialist, Project manager" },
+          assignee_name: { type: "string", description: "Exact name from the team list if one person clearly fits, else \"\"" },
+        },
+        required: ["title", "description", "days_before_due", "role", "assignee_name"],
+        additionalProperties: false,
+      },
+    },
+    notes: { type: "string", description: "Assumptions or risks worth flagging, one per line starting with '- '; \"\" if none" },
+  },
+  required: ["tasks", "notes"],
+  additionalProperties: false,
+} as const;
+
+export type WorkPlan = {
+  tasks: { title: string; description: string | null; days_before_due: number | null; role: string | null; assignee_name: string | null }[];
+  notes: string | null;
+};

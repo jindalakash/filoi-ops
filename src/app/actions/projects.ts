@@ -7,6 +7,8 @@ import { can } from "@/lib/permissions";
 import { guard, req, str, dateOf, numOf } from "@/lib/form";
 import { nextProjectCode } from "@/lib/codes";
 import { logActivity } from "@/lib/activity";
+import { getSetting } from "@/lib/settings";
+import { applyTemplateTo } from "@/lib/work";
 import type { ActionState } from "@/components/client";
 import type { DeliverableStatus, DeliverableType, ProjectStatus } from "@prisma/client";
 
@@ -67,6 +69,7 @@ export async function saveDeliverable(_: ActionState, fd: FormData): Promise<Act
     else {
       const seq = (await db.deliverable.count({ where: { projectId } })) + 1;
       dl = await db.deliverable.create({ data: { ...d, projectId, seq } });
+      if ((await getSetting("taskTemplates")).auto) await applyTemplateTo(dl.id, user.id);
       // optional billing milestone created together with the deliverable
       const amount = numOf(fd, "billAmount");
       if (amount && can(user.role, "finance")) {
@@ -77,6 +80,7 @@ export async function saveDeliverable(_: ActionState, fd: FormData): Promise<Act
     }
     await logActivity(user.id, id ? "update" : "create", "deliverable", dl.id, `${id ? "Updated" : "Added"} deliverable “${dl.title}”`);
     revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/deliverables");
     return { ok: id ? "Deliverable updated." : "Deliverable added." };
   });
 }

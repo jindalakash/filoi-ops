@@ -41,6 +41,7 @@ model User {
   workAssigned  WorkItem[]    @relation("WorkAssignee")
   workReported  WorkItem[]    @relation("WorkReporter")
   workComments  WorkComment[]
+  notifications Notification[]
 }
 
 // ───────────────────────── Clients ─────────────────────────
@@ -384,6 +385,7 @@ model NotificationLog {
 enum ExtractionKind {
   TENDER // TOR / RFP → proposal
   CONTRACT // contract / PO → deliverables & payment schedule
+  WORKPLAN // deliverable → suggested tasks
 }
 
 /// One AI reading of one or more uploaded documents, kept for review & audit.
@@ -661,6 +663,12 @@ model WorkItem {
   dueDate       DateTime?
   position      Float        @default(0) // order within a board column
   completedAt   DateTime?
+  // client issues
+  source        String? // EMAIL | CALL | MEETING | PORTAL | OTHER
+  clientContact String? // who reported it at the client
+  reportedAt    DateTime?
+  respondBy     DateTime? // target first response
+  respondedAt   DateTime? // set on first comment / move out of To do
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -684,4 +692,19 @@ model WorkComment {
   createdAt DateTime @default(now())
 
   @@index([itemId])
+}
+
+/// In-app notifications (bell). Emails are sent separately where it matters.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String // ASSIGNED | MENTION | COMMENT | STATUS | DUE | PROPOSAL
+  title     String
+  body      String?
+  href      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
 }

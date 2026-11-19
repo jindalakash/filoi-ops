@@ -63,7 +63,7 @@ export async function saveReminders(_: ActionState, fd: FormData): Promise<Actio
   return guard(async () => {
     await saveSetting("reminders", {
       enabled: fd.get("enabled") === "on", defaultDays: s(fd, "defaultDays") || "5,2,0", overdueDays: s(fd, "overdueDays"),
-      hour: Math.min(23, Math.max(0, numOf(fd, "hour") ?? 8)), digestEmails: s(fd, "digestEmails"),
+      hour: Math.min(23, Math.max(0, numOf(fd, "hour") ?? 8)), digestEmails: s(fd, "digestEmails"), weeklyDigest: fd.get("weeklyDigest") === "on",
     });
     revalidatePath("/settings");
     return { ok: "Reminder settings saved." };
@@ -153,5 +153,19 @@ export async function saveBackupSettings(_: ActionState, fd: FormData): Promise<
     });
     revalidatePath("/settings");
     return { ok: "Backup settings saved." };
+  });
+}
+
+export async function saveTaskTemplates(_: ActionState, fd: FormData): Promise<ActionState> {
+  await requireUser("admin");
+  return guard(async () => {
+    const raw = JSON.parse(String(fd.get("json") ?? "{}")) as { auto?: boolean; types?: Record<string, { title?: string; daysBefore?: number }[]> };
+    const types = Object.fromEntries(Object.entries(raw.types ?? {}).map(([k, list]) => [
+      k,
+      (list ?? []).map((t) => ({ title: String(t.title ?? "").trim().slice(0, 200), daysBefore: Math.max(-365, Math.min(365, Math.round(Number(t.daysBefore) || 0))) })).filter((t) => t.title),
+    ]));
+    await saveSetting("taskTemplates", { auto: !!raw.auto, types });
+    revalidatePath("/settings");
+    return { ok: "Task templates saved." };
   });
 }
